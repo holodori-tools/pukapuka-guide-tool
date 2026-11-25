@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>カスタムどうぶつしょうぎ 最善手解析</title>
+<title>ぷかぷかファイト 最善手解析</title>
 <style>
   :root {
     --bg-main: #0f172a;
@@ -21,8 +21,8 @@
 
     /* JSで画面サイズに応じて動的計算される変数 */
     --cell-size: 98px;
-    --dock-w: 80px;
-    --stock-piece-size: 44px;
+    --dock-w: 84px;
+    --stock-piece-size: 42px;
     --hand-piece-size: 26px;
   }
 
@@ -79,10 +79,11 @@
   }
 
   .header-title {
-    font-size: 0.92rem;
+    font-size: 0.95rem;
     font-weight: 800;
     white-space: nowrap;
     letter-spacing: -0.02em;
+    color: #e0f2fe;
   }
 
   .turn-pill {
@@ -168,7 +169,7 @@
     padding: 10px 12px;
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
     z-index: 200;
-    width: 320px;
+    width: 340px;
     max-width: calc(100vw - 24px);
   }
 
@@ -198,7 +199,7 @@
   }
 
   /* =========================================
-     上半分：横向き大盤面 ＋ 両サイド縦並び余りコマ
+     上半分：横向き大盤面 ＋ 両サイド縦並び余りコマ＆持ち駒
      ========================================= */
   .top-half {
     flex: 58;
@@ -251,7 +252,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
   }
 
   .dock-label {
@@ -271,22 +272,34 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     width: 100%;
   }
 
-  /* 持ち駒エリア */
+  /* 持ち駒ドロップエリア */
+  .hand-drop-zone {
+    width: 100%;
+    border-radius: 6px;
+    border: 1.5px dashed rgba(148, 163, 184, 0.45);
+    background: rgba(15, 23, 42, 0.45);
+    padding: 3px 2px;
+    transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  }
+
+  .hand-drop-zone.drag-over-hand {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.22);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
+  }
+
   .hand-row {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 3px;
     justify-content: center;
     align-items: center;
     width: 100%;
     min-height: calc(var(--hand-piece-size) + 4px);
-    background: rgba(15, 23, 42, 0.4);
-    border-radius: 5px;
-    padding: 2px;
   }
 
   /* 中央盤面（4列×3行） */
@@ -444,12 +457,10 @@
     pointer-events: none;
   }
 
-  /* 自分（右向き五角形）は少し左寄りに画像を配置して右先端矢印と重ならないようにする */
   .piece.self .piece-img-wrap {
     left: 44%;
   }
 
-  /* 敵（左向き五角形）は少し右寄りに画像を配置して左先端矢印と重ならないようにする */
   .piece.opp .piece-img-wrap {
     left: 56%;
   }
@@ -472,7 +483,7 @@
     font-size: calc(var(--stock-piece-size) * 0.45);
   }
 
-  /* 移動可能方向ドット（駒の周囲8方向） */
+  /* 移動可能方向ドット */
   .dir-dot {
     position: absolute;
     width: 5px;
@@ -619,6 +630,11 @@
     overflow: hidden;
   }
 
+  .best-move-card.opp-pred-mode {
+    background: rgba(244, 63, 94, 0.13);
+    border-color: rgba(244, 63, 94, 0.5);
+  }
+
   .best-top-row {
     display: flex;
     justify-content: space-between;
@@ -630,6 +646,10 @@
     font-size: 0.7rem;
     color: #6ee7b7;
     font-weight: 700;
+  }
+
+  .best-move-card.opp-pred-mode .best-caption {
+    color: #fda4af;
   }
 
   .stats-line {
@@ -662,7 +682,7 @@
   }
 
   .pv-chip.s-self { border-left: 3px solid var(--accent-self); }
-  .pv-chip.s-opp  { border-left: 3px solid var(--accent-opp); }
+  .pv-chip.s-opp  { border-left: 3px dashed var(--accent-opp); }
 
   /* 手順履歴バー */
   .history-strip {
@@ -724,9 +744,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.76rem;
+    font-size: 0.75rem;
     font-weight: 700;
     flex-shrink: 0;
+    gap: 6px;
+  }
+
+  .arrow-legend {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
   }
 
   .candidates-grid {
@@ -760,6 +787,11 @@
   .cand-card.top1 {
     border-left: 4px solid var(--accent-best);
     background: rgba(16, 185, 129, 0.08);
+  }
+
+  .cand-card.top1.opp-card {
+    border-left: 4px dashed var(--accent-opp);
+    background: rgba(244, 63, 94, 0.08);
   }
 
   .cand-top {
@@ -801,18 +833,18 @@
 <body>
 
 <div id="app">
-  <!-- 最上部コントロールバー（重なり防止設計） -->
+  <!-- 最上部コントロールバー -->
   <header id="topHeader">
     <div class="header-group">
-      <div class="header-title">🎮 カスタムどうぶつしょうぎ AI解析</div>
+      <div class="header-title">🫧 ぷかぷかファイト AI解析</div>
       <div id="turnPill" class="turn-pill turn-self">
-        <span id="turnText">🔵 自分の手番（▶右向き進軍）</span>
+        <span id="turnText">🔵 自分の手番（▶右進）</span>
         <button id="switchTurnBtn" style="padding:2px 7px; font-size:0.7rem;">手番切替</button>
       </div>
     </div>
 
     <div class="header-group">
-      <button id="rulesToggleBtn">📖 駒の動き</button>
+      <button id="rulesToggleBtn">📖 駒の動き・操作</button>
       <select id="depthSelect" title="先読み深さ">
         <option value="6">先読み: 6手</option>
         <option value="8">先読み: 8手</option>
@@ -825,9 +857,9 @@
       <button id="clearBoardBtn" class="btn-danger">🧹 盤面空</button>
     </div>
 
-    <!-- 駒の動きヘルプ（ポップオーバー） -->
+    <!-- ルール＆操作ヘルプポップオーバー -->
     <div id="rulesPopover" class="rules-popover">
-      <div style="font-size:0.8rem; font-weight:800; margin-bottom:6px; color:#38bdf8;">📖 駒の移動ルール（赤点＝移動方向）</div>
+      <div style="font-size:0.8rem; font-weight:800; margin-bottom:6px; color:#38bdf8;">🫧 ぷかぷかファイト 駒の動き＆操作</div>
       <div class="rule-row">
         <img src="https://i.imgur.com/eXP4522.png" alt="リーダー">
         <div><strong>リーダー</strong>：周囲全8方向に1マス</div>
@@ -842,16 +874,20 @@
       </div>
       <div class="rule-row">
         <img src="https://i.imgur.com/jp5zFi4.png" alt="カメ">
-        <div><strong>カメ(緑)</strong>：正面1マス（相手最奥列で金カメに成る）</div>
+        <div><strong>カメ</strong>：正面1マス（相手最奥列で金カメに成る）</div>
       </div>
       <div class="rule-row">
         <img src="https://i.imgur.com/heTAXAc.png" alt="金カメ">
         <div><strong>金カメ</strong>：斜め後ろ以外の6方向に1マス</div>
       </div>
+      <div style="font-size:0.72rem; color:#cbd5e1; margin-top:6px; line-height:1.45;">
+        ・<strong>初期配置調整</strong>：左右の「余りコマ」を盤面へドラッグで配置、<strong>「持ち駒」枠へドラッグ</strong>で最初から持つ余りコマに追加できます。<br>
+        ・<strong>削除</strong>：盤上や持ち駒を枠外へドラッグ（または右クリック）で削除。
+      </div>
     </div>
   </header>
 
-  <!-- 上半分：横向き大盤面 ＋ 両サイド縦並び余りコマ -->
+  <!-- 上半分：横向き大盤面 ＋ 両サイド縦並び余りコマ＆持ち駒 -->
   <section class="top-half" id="topHalf">
     <!-- 左サイド：自分の余りコマ（縦1列）＆ 持ち駒 -->
     <div class="side-dock self-dock" id="leftDock">
@@ -860,8 +896,8 @@
         <div class="dock-label">余りコマ</div>
         <div class="stock-column" id="selfStockList"></div>
       </div>
-      <div class="dock-block">
-        <div class="dock-label">持ち駒</div>
+      <div class="dock-block hand-drop-zone" data-side="1" title="ここに余りコマをドラッグすると自分の持ち駒に追加されます">
+        <div class="dock-label">持ち駒(+ドラッグ)</div>
         <div class="hand-row" id="selfHandList"></div>
       </div>
     </div>
@@ -884,6 +920,9 @@
               <marker id="ah-sub" markerWidth="6" markerHeight="4.5" refX="5" refY="2.25" orient="auto">
                 <polygon points="0 0, 6 2.25, 0 4.5" fill="#38bdf8" />
               </marker>
+              <marker id="ah-opp" markerWidth="7" markerHeight="5" refX="5.5" refY="2.5" orient="auto">
+                <polygon points="0 0, 7 2.5, 0 5" fill="#f43f5e" />
+              </marker>
             </defs>
             <g id="arrowLayer"></g>
           </svg>
@@ -903,8 +942,8 @@
         <div class="dock-label">余りコマ</div>
         <div class="stock-column" id="oppStockList"></div>
       </div>
-      <div class="dock-block">
-        <div class="dock-label">持ち駒</div>
+      <div class="dock-block hand-drop-zone" data-side="-1" title="ここに余りコマをドラッグすると敵の持ち駒に追加されます">
+        <div class="dock-label">持ち駒(+ドラッグ)</div>
         <div class="hand-row" id="oppHandList"></div>
       </div>
     </div>
@@ -924,7 +963,7 @@
         </div>
       </div>
 
-      <div class="best-move-card">
+      <div class="best-move-card" id="bestMoveCard">
         <div class="best-top-row">
           <span class="best-caption" id="bestCaption">推奨される最善手</span>
           <span class="stats-line" id="statsLine">探索: 0局面 | 0ms</span>
@@ -942,8 +981,8 @@
     <!-- 右カラム：候補手ランキング（2列グリッド） -->
     <div class="pred-cands-col" id="predCandsCol">
       <div class="cands-header">
-        <span>📊 候補手ランキング（ホバーで矢印 ／ クリックで着手）</span>
-        <span style="font-size:0.66rem; color:var(--text-muted);">盤外ドラッグ/右クリックで削除</span>
+        <span>📊 候補手ランキング（クリックで着手）</span>
+        <span class="arrow-legend">🟢実線:自分最善 ／ 🔴点線:敵予測</span>
       </div>
       <div class="candidates-grid" id="candidatesList"></div>
     </div>
@@ -962,11 +1001,11 @@
   const OPP = -1;
 
   const EMPTY = 0;
-  const LEADER = 1;    // リーダー = ライオン
-  const WHALE = 2;     // クジラ = ぞう
-  const DOLPHIN = 3;   // イルカ = キリン
-  const TURTLE_G = 4;  // カメ(緑) = ひよこ
-  const TURTLE_K = 5;  // カメ(金) = にわとり
+  const LEADER = 1;    // リーダー
+  const WHALE = 2;     // クジラ
+  const DOLPHIN = 3;   // イルカ
+  const TURTLE_G = 4;  // カメ
+  const TURTLE_K = 5;  // 金カメ
 
   const PIECE_INFO = {
     [LEADER]: {
@@ -1425,7 +1464,7 @@
   }
 
   // ==========================================
-  // 4. UI状態管理 & 動的リサイズ（ヘッダー高さ実測・スクロール完全防止）
+  // 4. UI状態管理 & 動的リサイズ（スクロール完全防止）
   // ==========================================
   let history = [createInitialState()];
   let historyIndex = 0;
@@ -1435,7 +1474,7 @@
   let legalTargets = [];
 
   let lastAnalysis = null;
-  let previewMove = null;
+  let previewItem = null; // { move, pv }
   let maxVisibleCandidates = 8;
 
   function getCurrentState() {
@@ -1476,12 +1515,12 @@
     const topAvailH = Math.max(160, topRect.height - 14);
     const topAvailW = Math.max(320, topRect.width - 24);
 
-    // 1. 縦1列に並ぶ5つの余りコマ + 持ち駒エリアがドック高さに収まるサイズ計算
-    const fixedDockChrome = 68;
-    const stockSize = Math.max(22, Math.min(48, Math.floor((topAvailH - fixedDockChrome - 22) / 6)));
+    // 1. 縦1列の5種類の余りコマ + 持ち駒エリアがドック高さに収まるサイズ計算
+    const fixedDockChrome = 72;
+    const stockSize = Math.max(20, Math.min(46, Math.floor((topAvailH - fixedDockChrome - 24) / 6)));
 
-    // 縦1列なのでドック幅はスリムに抑える（その分盤面を大きくする）
-    const dockW = Math.max(68, Math.min(92, stockSize + 28));
+    // 縦1列なのでドック幅をスリムに保ちつつ持ち駒ドロップ領域を確保
+    const dockW = Math.max(76, Math.min(104, stockSize + 38));
     const handSize = Math.max(20, Math.min(28, Math.floor((dockW - 18) / 3)));
 
     root.style.setProperty("--stock-piece-size", `${stockSize}px`);
@@ -1507,7 +1546,6 @@
 
   window.addEventListener("resize", () => {
     fitToViewport();
-    // ヘッダー折り返し高さ変化に追従するため1フレーム後にも再計算
     requestAnimationFrame(fitToViewport);
   });
 
@@ -1567,7 +1605,7 @@
     poly.setAttribute("stroke-linejoin", "round");
     svg.appendChild(poly);
 
-    // 先端の進行方向矢印（▶ または ◀）をくっきり描画
+    // 先端の進行方向矢印
     const arrow = document.createElementNS(ns, "polygon");
     if (side === SELF) {
       arrow.setAttribute("points", "75,39 90,50 75,61");
@@ -1589,10 +1627,8 @@
     if (variant === "stock") div.classList.add("stock-item");
     if (variant === "hand") div.classList.add("hand-item");
 
-    // 五角形背景＋進行方向矢印SVG
     div.appendChild(createPentagonSVG(side, isPromoted));
 
-    // 中央の256pxアイコン画像
     const imgWrap = document.createElement("div");
     imgWrap.className = "piece-img-wrap";
 
@@ -1607,7 +1643,6 @@
     imgWrap.appendChild(img);
     div.appendChild(imgWrap);
 
-    // 移動可能方向ドット
     const dots = side === SELF ? info.dotsSelf : info.dotsOpp;
     dots.forEach(dotClass => {
       const dot = document.createElement("span");
@@ -1619,7 +1654,7 @@
   }
 
   // ==========================================
-  // 6. ドラッグ＆ドロップ制御
+  // 6. ドラッグ＆ドロップ制御（盤面配置・持ち駒追加・着手・削除）
   // ==========================================
   function startPointerDrag(e, ctx) {
     if (e.button !== undefined && e.button !== 0) return;
@@ -1639,6 +1674,13 @@
     dragGhost.style.top = `${e.clientY}px`;
   }
 
+  function getDropTargetsAt(x, y) {
+    const els = document.elementsFromPoint(x, y);
+    const cell = els.find(el => el.classList && el.classList.contains("cell")) || null;
+    const handZone = els.find(el => el.classList && el.classList.contains("hand-drop-zone")) || null;
+    return { cell, handZone };
+  }
+
   window.addEventListener("pointermove", (e) => {
     if (!dragContext) return;
     const dist = Math.hypot(e.clientX - dragContext.startX, e.clientY - dragContext.startY);
@@ -1652,9 +1694,13 @@
     dragGhost.style.top = `${e.clientY}px`;
 
     document.querySelectorAll(".cell.drag-over").forEach(el => el.classList.remove("drag-over"));
-    const targetCell = getCellElementAt(e.clientX, e.clientY);
-    if (targetCell) {
-      targetCell.classList.add("drag-over");
+    document.querySelectorAll(".hand-drop-zone.drag-over-hand").forEach(el => el.classList.remove("drag-over-hand"));
+
+    const { cell, handZone } = getDropTargetsAt(e.clientX, e.clientY);
+    if (cell) {
+      cell.classList.add("drag-over");
+    } else if (handZone && dragContext.type !== LEADER) {
+      handZone.classList.add("drag-over-hand");
     }
   });
 
@@ -1664,38 +1710,76 @@
     dragContext = null;
     dragGhost.style.display = "none";
     document.querySelectorAll(".cell.drag-over").forEach(el => el.classList.remove("drag-over"));
+    document.querySelectorAll(".hand-drop-zone.drag-over-hand").forEach(el => el.classList.remove("drag-over-hand"));
 
     if (!ctx.moved) return;
 
-    const targetCell = getCellElementAt(e.clientX, e.clientY);
-    const targetIdx = targetCell ? parseInt(targetCell.dataset.idx, 10) : null;
+    const { cell, handZone } = getDropTargetsAt(e.clientX, e.clientY);
+    const targetIdx = cell ? parseInt(cell.dataset.idx, 10) : null;
+    const targetHandSide = handZone ? parseInt(handZone.dataset.side, 10) : null;
     const state = getCurrentState();
 
-    // 両サイドの「余りコマ(stock)」からのドラッグ → 盤面へ配置変更
+    // 1. 両サイドの「余りコマ(stock)」からのドラッグ
     if (ctx.source === "stock") {
+      // 盤面マスへドロップ → 盤面に配置
       if (targetIdx !== null) {
         const next = cloneState(state);
         next.board[targetIdx] = ctx.side * ctx.type;
         replaceCurrentStateForSetup(next);
+        return;
       }
-      return;
-    }
-
-    // 「持ち駒(hand)」からのドラッグ → 持ち駒打ち
-    if (ctx.source === "hand") {
-      if (targetIdx !== null && state.winner === 0 && ctx.side === state.turn) {
-        const legals = generateMoves(state);
-        const dropMove = legals.find(m => m.drop && m.piece === ctx.type && m.to === targetIdx);
-        if (dropMove) {
-          pushNewState(applyMove(state, dropMove));
+      // 「持ち駒」エリアへドロップ → 持ち駒に追加（リーダー以外）
+      if (targetHandSide !== null && ctx.type !== LEADER) {
+        const next = cloneState(state);
+        const handObj = targetHandSide === SELF ? next.handSelf : next.handOpp;
+        const handType = ctx.type === TURTLE_K ? TURTLE_G : ctx.type;
+        if (handObj[handType] < 4) {
+          handObj[handType]++;
+          replaceCurrentStateForSetup(next);
         }
       }
       return;
     }
 
-    // 盤面上の駒(board)からのドラッグ
+    // 2. 「持ち駒(hand)」からのドラッグ
+    if (ctx.source === "hand") {
+      // 盤面の空きマスへドロップ → 持ち駒打ち
+      if (targetIdx !== null && state.winner === 0 && ctx.side === state.turn) {
+        const legals = generateMoves(state);
+        const dropMove = legals.find(m => m.drop && m.piece === ctx.type && m.to === targetIdx);
+        if (dropMove) {
+          pushNewState(applyMove(state, dropMove));
+          return;
+        }
+      }
+      // 自分の持ち駒枠外へドラッグ → 持ち駒から1枚削除（配置修正用）
+      if (targetHandSide !== ctx.side && targetIdx === null) {
+        const next = cloneState(state);
+        const handObj = ctx.side === SELF ? next.handSelf : next.handOpp;
+        if (handObj[ctx.type] > 0) {
+          handObj[ctx.type]--;
+          replaceCurrentStateForSetup(next);
+        }
+      }
+      return;
+    }
+
+    // 3. 盤面上の駒(board)からのドラッグ
     if (ctx.source === "board") {
-      // 盤外へドロップ → 削除（配置変更）
+      // 持ち駒エリアへドロップ → 盤上から取り除き持ち駒へ移動
+      if (targetHandSide !== null && ctx.type !== LEADER) {
+        const next = cloneState(state);
+        next.board[ctx.fromIdx] = EMPTY;
+        const handObj = targetHandSide === SELF ? next.handSelf : next.handOpp;
+        const handType = ctx.type === TURTLE_K ? TURTLE_G : ctx.type;
+        if (handObj[handType] < 4) {
+          handObj[handType]++;
+        }
+        replaceCurrentStateForSetup(next);
+        return;
+      }
+
+      // 盤外へドロップ → 駒を削除
       if (targetIdx === null) {
         const next = cloneState(state);
         next.board[ctx.fromIdx] = EMPTY;
@@ -1723,13 +1807,8 @@
     }
   });
 
-  function getCellElementAt(x, y) {
-    const els = document.elementsFromPoint(x, y);
-    return els.find(el => el.classList && el.classList.contains("cell")) || null;
-  }
-
   // ==========================================
-  // 7. 盤面・両サイド縦並び余りコマ・矢印描画
+  // 7. 盤面・両サイド縦並び余りコマ・矢印描画（敵予測は点線矢印）
   // ==========================================
   function initSideStocks() {
     const types = [LEADER, WHALE, DOLPHIN, TURTLE_G, TURTLE_K];
@@ -1740,14 +1819,14 @@
 
     types.forEach(type => {
       const pSelf = createPieceElement(SELF, type, "stock");
-      pSelf.title = `盤面へドラッグして自分の${PIECE_INFO[type].name}を配置`;
+      pSelf.title = `盤面または持ち駒へドラッグ（自分の${PIECE_INFO[type].name}）`;
       pSelf.addEventListener("pointerdown", (e) => {
         startPointerDrag(e, { source: "stock", side: SELF, type });
       });
       selfStock.appendChild(pSelf);
 
       const pOpp = createPieceElement(OPP, type, "stock");
-      pOpp.title = `盤面へドラッグして敵の${PIECE_INFO[type].name}を配置`;
+      pOpp.title = `盤面または持ち駒へドラッグ（敵の${PIECE_INFO[type].name}）`;
       pOpp.addEventListener("pointerdown", (e) => {
         startPointerDrag(e, { source: "stock", side: OPP, type });
       });
@@ -1761,7 +1840,11 @@
 
     Array.from(grid.querySelectorAll(".cell")).forEach(el => el.remove());
 
-    const activeBestMove = previewMove || (lastAnalysis && lastAnalysis.results[0] ? lastAnalysis.results[0].move : null);
+    const activeItem = previewItem || (lastAnalysis && lastAnalysis.results[0] ? lastAnalysis.results[0] : null);
+    const activeBestMove = activeItem ? activeItem.move : null;
+    const secondaryOppMove = (state.turn === SELF && activeItem && activeItem.pv && activeItem.pv.length >= 2)
+      ? activeItem.pv[1]
+      : null;
 
     for (let i = 0; i < 12; i++) {
       const c = i % 4;
@@ -1834,7 +1917,7 @@
     }
 
     document.getElementById("undoBtn").disabled = historyIndex === 0;
-    renderArrows(activeBestMove);
+    renderArrows(activeBestMove, state.turn, secondaryOppMove);
   }
 
   function renderHandList(containerId, side, handObj, activeBestMove) {
@@ -1848,7 +1931,7 @@
 
       const slot = document.createElement("div");
       slot.className = "hand-slot";
-      slot.title = `持ち駒: ${PIECE_INFO[type].name} ×${count}（クリックまたはドラッグで打つ）`;
+      slot.title = `持ち駒: ${PIECE_INFO[type].name} ×${count}（クリック/ドラッグで打つ・右クリックで1枚減らす）`;
       if (selectedHandType === type && state.turn === side) {
         slot.classList.add("selected");
       }
@@ -1868,71 +1951,124 @@
       slot.appendChild(badge);
 
       slot.addEventListener("click", () => handleHandClick(side, type));
+      slot.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const next = cloneState(state);
+        const h = side === SELF ? next.handSelf : next.handOpp;
+        if (h[type] > 0) {
+          h[type]--;
+          replaceCurrentStateForSetup(next);
+        }
+      });
+
       container.appendChild(slot);
     });
 
     if (container.children.length === 0) {
       const none = document.createElement("span");
-      none.style.fontSize = "0.62rem";
+      none.style.fontSize = "0.58rem";
       none.style.color = "var(--text-muted)";
       none.textContent = "なし";
       container.appendChild(none);
     }
   }
 
-  function renderArrows(bestMove) {
-    const layer = document.getElementById("arrowLayer");
-    layer.innerHTML = "";
-    if (!bestMove) return;
-
-    const toR = Math.floor(bestMove.to / 4);
-    const toC = bestMove.to % 4;
+  function drawSingleArrow(layer, move, side, isPrimary, isPreview, offsetPerp = 0) {
+    const ns = "http://www.w3.org/2000/svg";
+    const isEnemyMove = (side === OPP);
+    const toR = Math.floor(move.to / 4);
+    const toC = move.to % 4;
     const x2 = (toC + 0.5) * 100;
     const y2 = (toR + 0.5) * 100;
 
-    if (bestMove.drop) {
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    if (move.drop) {
+      const circle = document.createElementNS(ns, "circle");
       circle.setAttribute("cx", x2);
       circle.setAttribute("cy", y2);
-      circle.setAttribute("r", "34");
+      circle.setAttribute("r", isPrimary ? "34" : "26");
       circle.setAttribute("fill", "none");
-      circle.setAttribute("stroke", "#10b981");
-      circle.setAttribute("stroke-width", "5");
-      circle.setAttribute("stroke-dasharray", "8 4");
+      circle.setAttribute("stroke", isEnemyMove ? "#f43f5e" : "#10b981");
+      circle.setAttribute("stroke-width", isPrimary ? "5" : "3.5");
+      circle.setAttribute("stroke-dasharray", isEnemyMove ? "7 5" : "8 4");
+      if (!isPrimary) circle.setAttribute("opacity", "0.78");
       layer.appendChild(circle);
 
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      const text = document.createElementNS(ns, "text");
       text.setAttribute("x", x2);
-      text.setAttribute("y", y2 + 5);
+      text.setAttribute("y", isPrimary ? y2 + 5 : y2 - 18);
       text.setAttribute("text-anchor", "middle");
-      text.setAttribute("fill", "#10b981");
-      text.setAttribute("font-size", "15");
+      text.setAttribute("fill", isEnemyMove ? "#fda4af" : "#10b981");
+      text.setAttribute("font-size", isPrimary ? "14" : "11");
       text.setAttribute("font-weight", "bold");
-      text.textContent = `${PIECE_INFO[bestMove.piece].name}打`;
+      text.textContent = `${isEnemyMove ? "予測:" : ""}${PIECE_INFO[move.piece].name}打`;
       layer.appendChild(text);
     } else {
-      const fromR = Math.floor(bestMove.from / 4);
-      const fromC = bestMove.from % 4;
-      const x1 = (fromC + 0.5) * 100;
-      const y1 = (fromR + 0.5) * 100;
+      const fromR = Math.floor(move.from / 4);
+      const fromC = move.from % 4;
+      let x1 = (fromC + 0.5) * 100;
+      let y1 = (fromR + 0.5) * 100;
+      let tx2 = x2;
+      let ty2 = y2;
 
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const len = Math.hypot(dx, dy);
-      const adjX2 = x2 - (dx / len) * 18;
-      const adjY2 = y2 - (dy / len) * 18;
+      const dx = tx2 - x1;
+      const dy = ty2 - y1;
+      const len = Math.hypot(dx, dy) || 1;
 
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      if (offsetPerp !== 0) {
+        const nx = -dy / len;
+        const ny = dx / len;
+        x1 += nx * offsetPerp;
+        y1 += ny * offsetPerp;
+        tx2 += nx * offsetPerp;
+        ty2 += ny * offsetPerp;
+      }
+
+      const adjX2 = tx2 - (dx / len) * 18;
+      const adjY2 = ty2 - (dy / len) * 18;
+
+      const line = document.createElementNS(ns, "line");
       line.setAttribute("x1", x1);
       line.setAttribute("y1", y1);
       line.setAttribute("x2", adjX2);
       line.setAttribute("y2", adjY2);
-      line.setAttribute("stroke", previewMove ? "#38bdf8" : "#10b981");
-      line.setAttribute("stroke-width", "8");
-      line.setAttribute("stroke-linecap", "round");
-      line.setAttribute("opacity", "0.9");
-      line.setAttribute("marker-end", previewMove ? "url(#ah-sub)" : "url(#ah-best)");
+
+      if (isEnemyMove) {
+        // 敵の移動は予測なので点線矢印にする
+        line.setAttribute("stroke", "#f43f5e");
+        line.setAttribute("stroke-width", isPrimary ? "7" : "4.5");
+        line.setAttribute("stroke-dasharray", isPrimary ? "10 6" : "8 5");
+        line.setAttribute("opacity", isPrimary ? "0.92" : "0.78");
+        line.setAttribute("marker-end", "url(#ah-opp)");
+      } else {
+        // 自分の最善手は実線矢印
+        line.setAttribute("stroke", isPreview ? "#38bdf8" : "#10b981");
+        line.setAttribute("stroke-width", "8");
+        line.setAttribute("stroke-linecap", "round");
+        line.setAttribute("opacity", "0.9");
+        line.setAttribute("marker-end", isPreview ? "url(#ah-sub)" : "url(#ah-best)");
+      }
+
       layer.appendChild(line);
+    }
+  }
+
+  function renderArrows(primaryMove, primarySide, secondaryOppMove) {
+    const layer = document.getElementById("arrowLayer");
+    layer.innerHTML = "";
+    if (!primaryMove) return;
+
+    // 1手目の矢印（自分なら実線、敵なら点線）
+    drawSingleArrow(layer, primaryMove, primarySide, true, !!previewItem, 0);
+
+    // 自分の手番の場合、2手目の「敵の予測応手」も点線矢印で重ねて可視化
+    if (primarySide === SELF && secondaryOppMove) {
+      let offset = 0;
+      if (!primaryMove.drop && !secondaryOppMove.drop &&
+          primaryMove.from === secondaryOppMove.to && primaryMove.to === secondaryOppMove.from) {
+        offset = 10; // 真逆の往復矢印が重ならないよう少しずらす
+      }
+      drawSingleArrow(layer, secondaryOppMove, OPP, false, false, offset);
     }
   }
 
@@ -2012,7 +2148,10 @@
 
   function triggerAnalysis() {
     const state = getCurrentState();
-    previewMove = null;
+    previewItem = null;
+
+    const bestCard = document.getElementById("bestMoveCard");
+    bestCard.classList.toggle("opp-pred-mode", state.turn === OPP);
 
     const hasSelfLeader = state.board.includes(SELF * LEADER);
     const hasOppLeader = state.board.includes(OPP * LEADER);
@@ -2070,7 +2209,9 @@
       document.getElementById("evalBarFill").style.width = `${evalInfo.pct}%`;
 
       document.getElementById("bestCaption").textContent =
-        state.turn === SELF ? "🔵 自分の最善手（敵の応手まで読んだ予測）" : "🔴 敵の最善手（予想される次の手）";
+        state.turn === SELF
+          ? "🔵 自分の最善手（実線）＋ 🔴 敵の予測応手（点線）"
+          : "🔴 敵の予測最善手（点線矢印）";
       document.getElementById("bestMoveVal").textContent = formatMove(best.move, state.turn);
 
       const pvBox = document.getElementById("pvSteps");
@@ -2092,11 +2233,10 @@
   function renderCandidateCards(analysis, state) {
     const listEl = document.getElementById("candidatesList");
     listEl.innerHTML = "";
-    const bestMove = analysis.results[0] ? analysis.results[0].move : null;
 
     analysis.results.slice(0, maxVisibleCandidates).forEach((item, idx) => {
       const card = document.createElement("div");
-      card.className = `cand-card ${idx === 0 ? "top1" : ""}`;
+      card.className = `cand-card ${idx === 0 ? "top1" : ""} ${state.turn === OPP ? "opp-card" : ""}`;
 
       const itemEval = formatEvalText(item.score, state.turn);
       let pvStr = "";
@@ -2115,12 +2255,12 @@
       `;
 
       card.addEventListener("mouseenter", () => {
-        previewMove = item.move;
-        renderArrows(previewMove);
+        previewItem = item;
+        renderBoardAndHands();
       });
       card.addEventListener("mouseleave", () => {
-        previewMove = null;
-        renderArrows(bestMove);
+        previewItem = null;
+        renderBoardAndHands();
       });
       card.addEventListener("click", () => {
         pushNewState(applyMove(state, item.move));
