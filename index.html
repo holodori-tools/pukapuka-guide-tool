@@ -1,0 +1,2232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>カスタムどうぶつしょうぎ 最善手解析</title>
+<style>
+  :root {
+    --bg-main: #0f172a;
+    --bg-panel: #1e293b;
+    --bg-card: #273549;
+    --border-color: #334155;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --accent-self: #38bdf8;
+    --accent-opp: #f43f5e;
+    --accent-best: #10b981;
+    --accent-warn: #f59e0b;
+    --board-bg: #e7c697;
+    --board-line: #8c6239;
+
+    /* JSで画面サイズに応じて動的計算される変数 */
+    --cell-size: 98px;
+    --dock-w: 80px;
+    --stock-piece-size: 44px;
+    --hand-piece-size: 26px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  }
+
+  #app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  /* =========================================
+     最上部コントロールバー（重なり防止・自動折り返し対応）
+     ========================================= */
+  header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 6px 10px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 50;
+  }
+
+  .header-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+  }
+
+  .header-title {
+    font-size: 0.92rem;
+    font-weight: 800;
+    white-space: nowrap;
+    letter-spacing: -0.02em;
+  }
+
+  .turn-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .turn-self {
+    background: rgba(56, 189, 248, 0.18);
+    border: 1px solid var(--accent-self);
+    color: #bae6fd;
+  }
+
+  .turn-opp {
+    background: rgba(244, 63, 94, 0.18);
+    border: 1px solid var(--accent-opp);
+    color: #fecdd3;
+  }
+
+  .turn-win {
+    background: rgba(16, 185, 129, 0.25);
+    border: 1px solid var(--accent-best);
+    color: #a7f3d0;
+  }
+
+  button, select {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    padding: 4px 9px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1.2;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  button:hover:not(:disabled) {
+    background: #334155;
+    border-color: #64748b;
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  button.btn-primary {
+    background: #0284c7;
+    border-color: #38bdf8;
+  }
+
+  button.btn-primary:hover:not(:disabled) {
+    background: #0369a1;
+  }
+
+  button.btn-danger {
+    background: #991b1b;
+    border-color: #ef4444;
+  }
+
+  button.btn-danger:hover:not(:disabled) {
+    background: #7f1d1d;
+  }
+
+  /* ルール確認ポップオーバー */
+  .rules-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 10px;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65);
+    z-index: 200;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+  }
+
+  .rules-popover.open {
+    display: block;
+  }
+
+  .rule-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+    font-size: 0.76rem;
+  }
+
+  .rule-row:last-child {
+    border-bottom: none;
+  }
+
+  .rule-row img {
+    width: 26px;
+    height: 26px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* =========================================
+     上半分：横向き大盤面 ＋ 両サイド縦並び余りコマ
+     ========================================= */
+  .top-half {
+    flex: 58;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .side-dock {
+    width: var(--dock-w);
+    height: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 5px 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .side-dock.self-dock {
+    border-top: 3px solid var(--accent-self);
+  }
+
+  .side-dock.opp-dock {
+    border-top: 3px solid var(--accent-opp);
+  }
+
+  .dock-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-align: center;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
+  .dock-block {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .dock-label {
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    background: rgba(15, 23, 42, 0.6);
+    padding: 1px 4px;
+    border-radius: 4px;
+    width: 100%;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* 余りコマを縦1列に配置 */
+  .stock-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+  }
+
+  /* 持ち駒エリア */
+  .hand-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 3px;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: calc(var(--hand-piece-size) + 4px);
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 5px;
+    padding: 2px;
+  }
+
+  /* 中央盤面（4列×3行） */
+  .board-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .col-coords {
+    display: grid;
+    grid-template-columns: repeat(4, var(--cell-size));
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+    padding-right: 16px;
+  }
+
+  .board-row-wrap {
+    display: flex;
+    align-items: center;
+  }
+
+  .board-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(4, var(--cell-size));
+    grid-template-rows: repeat(3, var(--cell-size));
+    width: calc(var(--cell-size) * 4);
+    height: calc(var(--cell-size) * 3);
+    background: var(--board-bg);
+    border: 3px solid var(--board-line);
+    border-radius: 6px;
+    box-shadow: inset 0 0 18px rgba(92, 60, 28, 0.3);
+  }
+
+  .row-coords {
+    display: grid;
+    grid-template-rows: repeat(3, var(--cell-size));
+    align-items: center;
+    justify-items: center;
+    width: 16px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .cell {
+    border: 1px solid rgba(140, 98, 57, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.12s;
+  }
+
+  .cell.zone-self {
+    background-color: rgba(56, 189, 248, 0.11);
+  }
+
+  .cell.zone-opp {
+    background-color: rgba(244, 63, 94, 0.11);
+  }
+
+  .cell:hover {
+    background-color: rgba(255, 255, 255, 0.24);
+  }
+
+  .cell.selected {
+    background-color: rgba(56, 189, 248, 0.42) !important;
+  }
+
+  .cell.last-move {
+    background-color: rgba(250, 204, 21, 0.34);
+  }
+
+  .cell.drag-over {
+    background-color: rgba(251, 191, 36, 0.48) !important;
+    box-shadow: inset 0 0 0 3px #fbbf24;
+  }
+
+  .cell.legal-target::after {
+    content: "";
+    width: calc(var(--cell-size) * 0.24);
+    height: calc(var(--cell-size) * 0.24);
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.78);
+    border: 2px solid #fff;
+    position: absolute;
+    z-index: 6;
+    pointer-events: none;
+  }
+
+  .cell.legal-capture {
+    box-shadow: inset 0 0 0 3px rgba(239, 68, 68, 0.9);
+  }
+
+  .cell.best-drop-target {
+    background-color: rgba(16, 185, 129, 0.36) !important;
+    box-shadow: inset 0 0 0 3px var(--accent-best);
+  }
+
+  /* =========================================
+     駒のデザイン（将棋駒型の五角形＋256px画像＋進行方向矢印）
+     ========================================= */
+  .piece {
+    width: calc(var(--cell-size) * 0.86);
+    height: calc(var(--cell-size) * 0.86);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    cursor: grab;
+    z-index: 2;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.38));
+  }
+
+  .piece:active {
+    cursor: grabbing;
+  }
+
+  .piece.stock-item {
+    width: var(--stock-piece-size);
+    height: var(--stock-piece-size);
+  }
+
+  .piece.hand-item {
+    width: var(--hand-piece-size);
+    height: var(--hand-piece-size);
+  }
+
+  .piece-pentagon-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .piece-img-wrap {
+    position: absolute;
+    width: 56%;
+    height: 56%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  /* 自分（右向き五角形）は少し左寄りに画像を配置して右先端矢印と重ならないようにする */
+  .piece.self .piece-img-wrap {
+    left: 44%;
+  }
+
+  /* 敵（左向き五角形）は少し右寄りに画像を配置して左先端矢印と重ならないようにする */
+  .piece.opp .piece-img-wrap {
+    left: 56%;
+  }
+
+  .piece-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    -webkit-user-drag: none;
+  }
+
+  .piece-fallback {
+    font-size: calc(var(--cell-size) * 0.34);
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .piece.stock-item .piece-fallback {
+    font-size: calc(var(--stock-piece-size) * 0.45);
+  }
+
+  /* 移動可能方向ドット（駒の周囲8方向） */
+  .dir-dot {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #dc2626;
+    border: 0.5px solid #fff;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .piece.stock-item .dir-dot {
+    width: 3.5px;
+    height: 3.5px;
+    border: none;
+  }
+  .piece.hand-item .dir-dot {
+    display: none;
+  }
+  .d-nw { top: 6%; left: 6%; }
+  .d-n  { top: 3%; left: 50%; transform: translateX(-50%); }
+  .d-ne { top: 6%; right: 6%; }
+  .d-w  { top: 50%; left: 1%; transform: translateY(-50%); }
+  .d-e  { top: 50%; right: 1%; transform: translateY(-50%); }
+  .d-sw { bottom: 6%; left: 6%; }
+  .d-s  { bottom: 3%; left: 50%; transform: translateX(-50%); }
+  .d-se { bottom: 6%; right: 6%; }
+
+  .hand-slot {
+    position: relative;
+  }
+
+  .hand-slot.selected .piece {
+    filter: drop-shadow(0 0 6px var(--accent-self));
+  }
+
+  .hand-slot.best-drop .piece {
+    filter: drop-shadow(0 0 8px var(--accent-best));
+  }
+
+  .count-badge {
+    position: absolute;
+    bottom: -3px;
+    right: -3px;
+    background: #0f172a;
+    color: #fff;
+    border: 1px solid #64748b;
+    font-size: 0.58rem;
+    font-weight: 800;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .arrow-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* =========================================
+     下半分：AIの手の予測＆先読み解析パネル
+     ========================================= */
+  .bottom-half {
+    flex: 42;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 7px 12px;
+    display: grid;
+    grid-template-columns: 1.05fr 1.35fr;
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .pred-main-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 5px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .eval-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 6px 10px;
+    flex-shrink: 0;
+  }
+
+  .eval-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .eval-score {
+    font-size: 0.96rem;
+    font-weight: 800;
+  }
+
+  .score-win { color: var(--accent-best); }
+  .score-lose { color: var(--accent-opp); }
+  .score-even { color: var(--accent-self); }
+
+  .eval-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--accent-opp);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .eval-bar-fill {
+    height: 100%;
+    background: var(--accent-self);
+    width: 50%;
+    transition: width 0.25s ease;
+  }
+
+  .best-move-card {
+    flex: 1;
+    background: rgba(16, 185, 129, 0.13);
+    border: 1px solid rgba(16, 185, 129, 0.45);
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .best-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .best-caption {
+    font-size: 0.7rem;
+    color: #6ee7b7;
+    font-weight: 700;
+  }
+
+  .stats-line {
+    font-size: 0.64rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .best-move-val {
+    font-size: 1.04rem;
+    font-weight: 800;
+    color: #fff;
+    margin: 2px 0 4px;
+  }
+
+  .pv-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    overflow: hidden;
+  }
+
+  .pv-chip {
+    font-size: 0.7rem;
+    background: rgba(15, 23, 42, 0.75);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    white-space: nowrap;
+  }
+
+  .pv-chip.s-self { border-left: 3px solid var(--accent-self); }
+  .pv-chip.s-opp  { border-left: 3px solid var(--accent-opp); }
+
+  /* 手順履歴バー */
+  .history-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 2px 8px;
+    height: 26px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .history-label {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .history-items {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    flex: 1;
+  }
+
+  .history-chip {
+    font-size: 0.66rem;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .history-chip.current {
+    background: var(--accent-self);
+    color: #0f172a;
+    font-weight: 800;
+  }
+
+  /* 下半分・右列：候補手ランキング */
+  .pred-cands-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .cands-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.76rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .candidates-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 5px;
+    align-content: start;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .cand-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transition: border-color 0.12s, background 0.12s;
+    min-width: 0;
+  }
+
+  .cand-card:hover {
+    border-color: var(--accent-self);
+    background: #30415a;
+  }
+
+  .cand-card.top1 {
+    border-left: 4px solid var(--accent-best);
+    background: rgba(16, 185, 129, 0.08);
+  }
+
+  .cand-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    font-weight: 700;
+    gap: 4px;
+  }
+
+  .cand-move-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cand-pv {
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+  }
+
+  /* ドラッグ中のゴースト */
+  #dragGhost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 0.92;
+    display: none;
+    filter: drop-shadow(0 8px 16px rgba(0,0,0,0.55));
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 最上部コントロールバー（重なり防止設計） -->
+  <header id="topHeader">
+    <div class="header-group">
+      <div class="header-title">🎮 カスタムどうぶつしょうぎ AI解析</div>
+      <div id="turnPill" class="turn-pill turn-self">
+        <span id="turnText">🔵 自分の手番（▶右向き進軍）</span>
+        <button id="switchTurnBtn" style="padding:2px 7px; font-size:0.7rem;">手番切替</button>
+      </div>
+    </div>
+
+    <div class="header-group">
+      <button id="rulesToggleBtn">📖 駒の動き</button>
+      <select id="depthSelect" title="先読み深さ">
+        <option value="6">先読み: 6手</option>
+        <option value="8">先読み: 8手</option>
+        <option value="10" selected>先読み: 10手（標準）</option>
+        <option value="12">先読み: 12手（深読み）</option>
+        <option value="14">先読み: 14手（完全級）</option>
+      </select>
+      <button id="undoBtn">↩ 1手戻す</button>
+      <button id="resetBtn" class="btn-primary">🔄 初期配置</button>
+      <button id="clearBoardBtn" class="btn-danger">🧹 盤面空</button>
+    </div>
+
+    <!-- 駒の動きヘルプ（ポップオーバー） -->
+    <div id="rulesPopover" class="rules-popover">
+      <div style="font-size:0.8rem; font-weight:800; margin-bottom:6px; color:#38bdf8;">📖 駒の移動ルール（赤点＝移動方向）</div>
+      <div class="rule-row">
+        <img src="https://i.imgur.com/eXP4522.png" alt="リーダー">
+        <div><strong>リーダー</strong>：周囲全8方向に1マス</div>
+      </div>
+      <div class="rule-row">
+        <img src="https://i.imgur.com/u6W6WRH.png" alt="クジラ">
+        <div><strong>クジラ</strong>：斜め4方向に1マス</div>
+      </div>
+      <div class="rule-row">
+        <img src="https://i.imgur.com/oj1ZU84.png" alt="イルカ">
+        <div><strong>イルカ</strong>：縦横4方向に1マス</div>
+      </div>
+      <div class="rule-row">
+        <img src="https://i.imgur.com/jp5zFi4.png" alt="カメ">
+        <div><strong>カメ(緑)</strong>：正面1マス（相手最奥列で金カメに成る）</div>
+      </div>
+      <div class="rule-row">
+        <img src="https://i.imgur.com/heTAXAc.png" alt="金カメ">
+        <div><strong>金カメ</strong>：斜め後ろ以外の6方向に1マス</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 上半分：横向き大盤面 ＋ 両サイド縦並び余りコマ -->
+  <section class="top-half" id="topHalf">
+    <!-- 左サイド：自分の余りコマ（縦1列）＆ 持ち駒 -->
+    <div class="side-dock self-dock" id="leftDock">
+      <div class="dock-title" style="color:#7dd3fc;">🔵 自分 ▶</div>
+      <div class="dock-block">
+        <div class="dock-label">余りコマ</div>
+        <div class="stock-column" id="selfStockList"></div>
+      </div>
+      <div class="dock-block">
+        <div class="dock-label">持ち駒</div>
+        <div class="hand-row" id="selfHandList"></div>
+      </div>
+    </div>
+
+    <!-- 中央：4列×3行 横向き盤面 -->
+    <div class="board-center">
+      <div class="col-coords">
+        <div>1（自陣）</div>
+        <div>2</div>
+        <div>3</div>
+        <div>4（敵陣）</div>
+      </div>
+      <div class="board-row-wrap">
+        <div class="board-grid" id="boardGrid">
+          <svg id="arrowOverlay" class="arrow-overlay" viewBox="0 0 400 300">
+            <defs>
+              <marker id="ah-best" markerWidth="7" markerHeight="5" refX="5.5" refY="2.5" orient="auto">
+                <polygon points="0 0, 7 2.5, 0 5" fill="#10b981" />
+              </marker>
+              <marker id="ah-sub" markerWidth="6" markerHeight="4.5" refX="5" refY="2.25" orient="auto">
+                <polygon points="0 0, 6 2.25, 0 4.5" fill="#38bdf8" />
+              </marker>
+            </defs>
+            <g id="arrowLayer"></g>
+          </svg>
+        </div>
+        <div class="row-coords">
+          <div>一</div>
+          <div>二</div>
+          <div>三</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右サイド：敵の余りコマ（縦1列）＆ 持ち駒 -->
+    <div class="side-dock opp-dock" id="rightDock">
+      <div class="dock-title" style="color:#fda4af;">◀ 敵 🔴</div>
+      <div class="dock-block">
+        <div class="dock-label">余りコマ</div>
+        <div class="stock-column" id="oppStockList"></div>
+      </div>
+      <div class="dock-block">
+        <div class="dock-label">持ち駒</div>
+        <div class="hand-row" id="oppHandList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 下半分：手の予測エリア -->
+  <section class="bottom-half" id="bottomHalf">
+    <!-- 左カラム：形勢判断＋最善手＋読み筋＋手順履歴 -->
+    <div class="pred-main-col">
+      <div class="eval-card">
+        <div class="eval-header">
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">⚖️ 形勢判断</span>
+          <span id="evalScoreText" class="eval-score score-even">計算中...</span>
+        </div>
+        <div class="eval-bar">
+          <div id="evalBarFill" class="eval-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="best-move-card">
+        <div class="best-top-row">
+          <span class="best-caption" id="bestCaption">推奨される最善手</span>
+          <span class="stats-line" id="statsLine">探索: 0局面 | 0ms</span>
+        </div>
+        <div class="best-move-val" id="bestMoveVal">-</div>
+        <div class="pv-steps" id="pvSteps"></div>
+      </div>
+
+      <div class="history-strip">
+        <span class="history-label">📜 手順:</span>
+        <div class="history-items" id="historyItems"></div>
+      </div>
+    </div>
+
+    <!-- 右カラム：候補手ランキング（2列グリッド） -->
+    <div class="pred-cands-col" id="predCandsCol">
+      <div class="cands-header">
+        <span>📊 候補手ランキング（ホバーで矢印 ／ クリックで着手）</span>
+        <span style="font-size:0.66rem; color:var(--text-muted);">盤外ドラッグ/右クリックで削除</span>
+      </div>
+      <div class="candidates-grid" id="candidatesList"></div>
+    </div>
+  </section>
+</div>
+
+<!-- ドラッグ追従ゴースト -->
+<div id="dragGhost"></div>
+
+<script>
+(() => {
+  // ==========================================
+  // 1. 定数・横向き盤面定義（4列×3行）
+  // ==========================================
+  const SELF = 1;
+  const OPP = -1;
+
+  const EMPTY = 0;
+  const LEADER = 1;    // リーダー = ライオン
+  const WHALE = 2;     // クジラ = ぞう
+  const DOLPHIN = 3;   // イルカ = キリン
+  const TURTLE_G = 4;  // カメ(緑) = ひよこ
+  const TURTLE_K = 5;  // カメ(金) = にわとり
+
+  const PIECE_INFO = {
+    [LEADER]: {
+      name: "リーダー",
+      img: "https://i.imgur.com/eXP4522.png",
+      fallback: "👑",
+      val: 10000,
+      dirs: [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]],
+      dotsSelf: ["d-nw","d-n","d-ne","d-w","d-e","d-sw","d-s","d-se"],
+      dotsOpp:  ["d-nw","d-n","d-ne","d-w","d-e","d-sw","d-s","d-se"]
+    },
+    [WHALE]: {
+      name: "クジラ",
+      img: "https://i.imgur.com/u6W6WRH.png",
+      fallback: "🐋",
+      val: 330,
+      dirs: [[-1,-1],[-1,1],[1,-1],[1,1]],
+      dotsSelf: ["d-nw","d-ne","d-sw","d-se"],
+      dotsOpp:  ["d-nw","d-ne","d-sw","d-se"]
+    },
+    [DOLPHIN]: {
+      name: "イルカ",
+      img: "https://i.imgur.com/oj1ZU84.png",
+      fallback: "🐬",
+      val: 360,
+      dirs: [[-1,0],[1,0],[0,-1],[0,1]],
+      dotsSelf: ["d-n","d-s","d-w","d-e"],
+      dotsOpp:  ["d-n","d-s","d-w","d-e"]
+    },
+    [TURTLE_G]: {
+      name: "カメ",
+      img: "https://i.imgur.com/jp5zFi4.png",
+      fallback: "🐢",
+      val: 110,
+      dirs: [[0, 1]],
+      dotsSelf: ["d-e"],
+      dotsOpp:  ["d-w"]
+    },
+    [TURTLE_K]: {
+      name: "金カメ",
+      img: "https://i.imgur.com/heTAXAc.png",
+      fallback: "🌟",
+      val: 450,
+      dirs: [[-1,0],[-1,1],[0,1],[1,1],[1,0],[0,-1]],
+      dotsSelf: ["d-n","d-ne","d-e","d-se","d-s","d-w"],
+      dotsOpp:  ["d-n","d-nw","d-w","d-sw","d-s","d-e"]
+    }
+  };
+
+  const COL_LABELS = ["1", "2", "3", "4"];
+  const ROW_LABELS = ["一", "二", "三"];
+
+  function createInitialState() {
+    const board = [
+       DOLPHIN,  EMPTY,     EMPTY,    -WHALE,
+       LEADER,   TURTLE_G, -TURTLE_G, -LEADER,
+       WHALE,    EMPTY,     EMPTY,    -DOLPHIN
+    ];
+    return {
+      board,
+      handSelf: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
+      handOpp:  { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
+      turn: SELF,
+      lastMove: null,
+      winner: 0,
+      winReason: ""
+    };
+  }
+
+  function cloneState(s) {
+    return {
+      board: s.board.slice(),
+      handSelf: { ...s.handSelf },
+      handOpp: { ...s.handOpp },
+      turn: s.turn,
+      lastMove: s.lastMove ? { ...s.lastMove } : null,
+      winner: s.winner,
+      winReason: s.winReason
+    };
+  }
+
+  // ==========================================
+  // 2. ルールエンジン
+  // ==========================================
+  function isSquareAttacked(board, targetIdx, attackerSide) {
+    const tr = Math.floor(targetIdx / 4);
+    const tc = targetIdx % 4;
+
+    for (let i = 0; i < 12; i++) {
+      const p = board[i];
+      if (p === EMPTY || Math.sign(p) !== attackerSide) continue;
+      const type = Math.abs(p);
+      const r = Math.floor(i / 4);
+      const c = i % 4;
+      const dirs = PIECE_INFO[type].dirs;
+
+      for (let d = 0; d < dirs.length; d++) {
+        const nr = r + dirs[d][0] * attackerSide;
+        const nc = c + dirs[d][1] * attackerSide;
+        if (nr === tr && nc === tc) return true;
+      }
+    }
+    return false;
+  }
+
+  function generateMoves(state) {
+    if (state.winner !== 0) return [];
+    const { board, turn } = state;
+    const hand = turn === SELF ? state.handSelf : state.handOpp;
+    const moves = [];
+
+    for (let i = 0; i < 12; i++) {
+      const p = board[i];
+      if (p === EMPTY || Math.sign(p) !== turn) continue;
+      const type = Math.abs(p);
+      const r = Math.floor(i / 4);
+      const c = i % 4;
+      const dirs = PIECE_INFO[type].dirs;
+
+      for (let d = 0; d < dirs.length; d++) {
+        const nr = r + dirs[d][0] * turn;
+        const nc = c + dirs[d][1] * turn;
+        if (nr < 0 || nr >= 3 || nc < 0 || nc >= 4) continue;
+        const to = nr * 4 + nc;
+        const target = board[to];
+        if (target !== EMPTY && Math.sign(target) === turn) continue;
+
+        const promoteZone = (turn === SELF && nc === 3) || (turn === OPP && nc === 0);
+        const promote = (type === TURTLE_G && promoteZone);
+
+        moves.push({
+          from: i,
+          to,
+          piece: type,
+          captured: target !== EMPTY ? Math.abs(target) : EMPTY,
+          promote,
+          drop: false
+        });
+      }
+    }
+
+    for (const type of [WHALE, DOLPHIN, TURTLE_G]) {
+      if (hand[type] > 0) {
+        for (let i = 0; i < 12; i++) {
+          if (board[i] === EMPTY) {
+            moves.push({
+              from: -1,
+              to: i,
+              piece: type,
+              captured: EMPTY,
+              promote: false,
+              drop: true
+            });
+          }
+        }
+      }
+    }
+
+    return moves;
+  }
+
+  function applyMove(state, move) {
+    const next = cloneState(state);
+    const turn = state.turn;
+    const hand = turn === SELF ? next.handSelf : next.handOpp;
+
+    if (move.drop) {
+      hand[move.piece]--;
+      next.board[move.to] = turn * move.piece;
+    } else {
+      const target = next.board[move.to];
+      if (target !== EMPTY) {
+        const capType = Math.abs(target);
+        if (capType === LEADER) {
+          next.board[move.to] = turn * move.piece;
+          next.board[move.from] = EMPTY;
+          next.winner = turn;
+          next.winReason = "リーダー捕獲";
+          next.lastMove = move;
+          next.turn = -turn;
+          return next;
+        }
+        const handType = capType === TURTLE_K ? TURTLE_G : capType;
+        hand[handType]++;
+      }
+      const finalType = move.promote ? TURTLE_K : move.piece;
+      next.board[move.to] = turn * finalType;
+      next.board[move.from] = EMPTY;
+    }
+
+    const leaderPos = next.board.indexOf(turn * LEADER);
+    if (leaderPos !== -1) {
+      const lc = leaderPos % 4;
+      const inEnemyBack = (turn === SELF && lc === 3) || (turn === OPP && lc === 0);
+      if (inEnemyBack && !isSquareAttacked(next.board, leaderPos, -turn)) {
+        next.winner = turn;
+        next.winReason = "トライ成立！";
+      }
+    }
+
+    next.lastMove = move;
+    next.turn = -turn;
+    return next;
+  }
+
+  function formatMove(move, side) {
+    if (!move) return "";
+    const prefix = side === SELF ? "🔵" : "🔴";
+    const toR = Math.floor(move.to / 4);
+    const toC = move.to % 4;
+    const coord = `${COL_LABELS[toC]}${ROW_LABELS[toR]}`;
+    const pName = PIECE_INFO[move.piece].name;
+    if (move.drop) return `${prefix}${coord}${pName}打`;
+    return `${prefix}${coord}${pName}${move.promote ? "成" : ""}`;
+  }
+
+  // ==========================================
+  // 3. AI探索エンジン（Alpha-Beta + 反復深化 + 置換表）
+  // ==========================================
+  const MATE_SCORE = 100000;
+  let transpositionTable = new Map();
+  let nodesSearched = 0;
+  let searchStartTime = 0;
+  let timeLimitMs = 1300;
+  let searchAborted = false;
+
+  function getStateHash(state) {
+    return state.board.join(",") + "|" +
+      state.handSelf[2] + state.handSelf[3] + state.handSelf[4] + "|" +
+      state.handOpp[2] + state.handOpp[3] + state.handOpp[4] + "|" +
+      state.turn;
+  }
+
+  function evaluate(state) {
+    if (state.winner !== 0) {
+      return state.winner === state.turn ? MATE_SCORE : -MATE_SCORE;
+    }
+
+    let score = 0;
+    const b = state.board;
+
+    for (let i = 0; i < 12; i++) {
+      const p = b[i];
+      if (p === EMPTY) continue;
+      const side = Math.sign(p);
+      const type = Math.abs(p);
+      const r = Math.floor(i / 4);
+      const c = i % 4;
+
+      let val = PIECE_INFO[type].val;
+
+      if (type === LEADER) {
+        const advance = side === SELF ? c : (3 - c);
+        val += advance * 28;
+        if (r === 1) val += 10;
+      } else if (type === TURTLE_G) {
+        const advance = side === SELF ? c : (3 - c);
+        val += advance * 25;
+      } else {
+        if (r === 1 && (c === 1 || c === 2)) val += 18;
+      }
+
+      score += side * val;
+    }
+
+    score += state.handSelf[WHALE] * 340 + state.handSelf[DOLPHIN] * 370 + state.handSelf[TURTLE_G] * 130;
+    score -= state.handOpp[WHALE] * 340 + state.handOpp[DOLPHIN] * 370 + state.handOpp[TURTLE_G] * 130;
+
+    return score * state.turn;
+  }
+
+  function scoreMoveForOrdering(move, ttBestMove) {
+    if (ttBestMove &&
+        move.from === ttBestMove.from &&
+        move.to === ttBestMove.to &&
+        move.piece === ttBestMove.piece &&
+        move.drop === ttBestMove.drop) {
+      return 100000;
+    }
+    let s = 0;
+    if (move.captured === LEADER) return 90000;
+    if (move.captured !== EMPTY) s += 1000 + PIECE_INFO[move.captured].val;
+    if (move.promote) s += 800;
+    if (move.piece === LEADER) s += 100;
+    return s;
+  }
+
+  function alphaBeta(state, depth, alpha, beta, ply, pathHashes) {
+    nodesSearched++;
+    if ((nodesSearched & 2047) === 0) {
+      if (performance.now() - searchStartTime > timeLimitMs) {
+        searchAborted = true;
+        return 0;
+      }
+    }
+
+    if (state.winner !== 0) {
+      return -(MATE_SCORE - ply);
+    }
+
+    const hash = getStateHash(state);
+    if (ply > 0 && pathHashes.has(hash)) {
+      return 0;
+    }
+
+    const alphaOrig = alpha;
+    const ttEntry = transpositionTable.get(hash);
+    if (ttEntry && ttEntry.depth >= depth) {
+      let ttScore = ttEntry.score;
+      if (ttScore > MATE_SCORE - 100) ttScore -= ply;
+      else if (ttScore < -MATE_SCORE + 100) ttScore += ply;
+
+      if (ttEntry.flag === 0) return ttScore;
+      if (ttEntry.flag === 1 && ttScore > alpha) alpha = ttScore;
+      if (ttEntry.flag === 2 && ttScore < beta) beta = ttScore;
+      if (alpha >= beta) return ttScore;
+    }
+
+    if (depth <= 0) {
+      return evaluate(state);
+    }
+
+    const moves = generateMoves(state);
+    if (moves.length === 0) {
+      return -(MATE_SCORE - ply);
+    }
+
+    const ttMove = ttEntry ? ttEntry.bestMove : null;
+    moves.sort((a, b) => scoreMoveForOrdering(b, ttMove) - scoreMoveForOrdering(a, ttMove));
+
+    let bestScore = -Infinity;
+    let bestMove = moves[0];
+    pathHashes.add(hash);
+
+    for (let i = 0; i < moves.length; i++) {
+      const nextState = applyMove(state, moves[i]);
+      const score = -alphaBeta(nextState, depth - 1, -beta, -alpha, ply + 1, pathHashes);
+
+      if (searchAborted) {
+        pathHashes.delete(hash);
+        return 0;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = moves[i];
+      }
+      if (score > alpha) alpha = score;
+      if (alpha >= beta) break;
+    }
+
+    pathHashes.delete(hash);
+
+    let storeScore = bestScore;
+    if (storeScore > MATE_SCORE - 100) storeScore += ply;
+    else if (storeScore < -MATE_SCORE + 100) storeScore -= ply;
+
+    let flag = 0;
+    if (bestScore <= alphaOrig) flag = 2;
+    else if (bestScore >= beta) flag = 1;
+
+    if (transpositionTable.size > 150000) transpositionTable.clear();
+    transpositionTable.set(hash, { depth, score: storeScore, flag, bestMove });
+
+    return bestScore;
+  }
+
+  function extractPV(rootState, firstMove, maxLen = 10) {
+    const pv = [firstMove];
+    let curr = applyMove(rootState, firstMove);
+    const seen = new Set([getStateHash(rootState)]);
+
+    for (let i = 1; i < maxLen; i++) {
+      if (curr.winner !== 0) break;
+      const h = getStateHash(curr);
+      if (seen.has(h)) break;
+      seen.add(h);
+
+      const entry = transpositionTable.get(h);
+      if (!entry || !entry.bestMove) break;
+
+      const legals = generateMoves(curr);
+      const valid = legals.find(m =>
+        m.from === entry.bestMove.from &&
+        m.to === entry.bestMove.to &&
+        m.piece === entry.bestMove.piece &&
+        m.drop === entry.bestMove.drop
+      );
+      if (!valid) break;
+
+      pv.push(valid);
+      curr = applyMove(curr, valid);
+    }
+    return pv;
+  }
+
+  function analyzePosition(rootState, maxDepth) {
+    const t0 = performance.now();
+    searchStartTime = t0;
+    nodesSearched = 0;
+    searchAborted = false;
+
+    const rootMoves = generateMoves(rootState);
+    if (rootMoves.length === 0 || rootState.winner !== 0) {
+      return { results: [], nodes: 0, elapsed: 0, reachedDepth: 0 };
+    }
+
+    let completedResults = [];
+    let reachedDepth = 0;
+
+    for (let d = 1; d <= maxDepth; d++) {
+      const currentResults = [];
+
+      if (completedResults.length > 0) {
+        const orderMap = new Map();
+        completedResults.forEach((r, idx) => {
+          orderMap.set(`${r.move.from}_${r.move.to}_${r.move.piece}_${r.move.drop}`, idx);
+        });
+        rootMoves.sort((a, b) => {
+          const ka = `${a.from}_${a.to}_${a.piece}_${a.drop}`;
+          const kb = `${b.from}_${b.to}_${b.piece}_${b.drop}`;
+          return (orderMap.get(ka) ?? 999) - (orderMap.get(kb) ?? 999);
+        });
+      }
+
+      for (let i = 0; i < rootMoves.length; i++) {
+        const m = rootMoves[i];
+        const nextState = applyMove(rootState, m);
+        const pathHashes = new Set([getStateHash(rootState)]);
+        const score = -alphaBeta(nextState, d - 1, -Infinity, Infinity, 1, pathHashes);
+
+        if (searchAborted) break;
+
+        currentResults.push({
+          move: m,
+          score,
+          pv: extractPV(rootState, m, Math.min(d, 10))
+        });
+      }
+
+      if (searchAborted && d > 1) break;
+
+      currentResults.sort((a, b) => b.score - a.score);
+      completedResults = currentResults;
+      reachedDepth = d;
+
+      if (completedResults[0].score > MATE_SCORE - 20 && d >= 6) break;
+    }
+
+    return {
+      results: completedResults,
+      nodes: nodesSearched,
+      elapsed: Math.round(performance.now() - t0),
+      reachedDepth
+    };
+  }
+
+  // ==========================================
+  // 4. UI状態管理 & 動的リサイズ（ヘッダー高さ実測・スクロール完全防止）
+  // ==========================================
+  let history = [createInitialState()];
+  let historyIndex = 0;
+
+  let selectedBoardIdx = null;
+  let selectedHandType = null;
+  let legalTargets = [];
+
+  let lastAnalysis = null;
+  let previewMove = null;
+  let maxVisibleCandidates = 8;
+
+  function getCurrentState() {
+    return history[historyIndex];
+  }
+
+  function pushNewState(newState) {
+    history = history.slice(0, historyIndex + 1);
+    history.push(newState);
+    historyIndex = history.length - 1;
+    clearSelection();
+    renderAll();
+    triggerAnalysis();
+  }
+
+  function replaceCurrentStateForSetup(newState) {
+    newState.winner = 0;
+    newState.winReason = "";
+    newState.lastMove = null;
+    history = [newState];
+    historyIndex = 0;
+    clearSelection();
+    renderAll();
+    triggerAnalysis();
+  }
+
+  function clearSelection() {
+    selectedBoardIdx = null;
+    selectedHandType = null;
+    legalTargets = [];
+  }
+
+  function fitToViewport() {
+    const root = document.documentElement;
+
+    const topHalfEl = document.getElementById("topHalf");
+    const topRect = topHalfEl.getBoundingClientRect();
+    const topAvailH = Math.max(160, topRect.height - 14);
+    const topAvailW = Math.max(320, topRect.width - 24);
+
+    // 1. 縦1列に並ぶ5つの余りコマ + 持ち駒エリアがドック高さに収まるサイズ計算
+    const fixedDockChrome = 68;
+    const stockSize = Math.max(22, Math.min(48, Math.floor((topAvailH - fixedDockChrome - 22) / 6)));
+
+    // 縦1列なのでドック幅はスリムに抑える（その分盤面を大きくする）
+    const dockW = Math.max(68, Math.min(92, stockSize + 28));
+    const handSize = Math.max(20, Math.min(28, Math.floor((dockW - 18) / 3)));
+
+    root.style.setProperty("--stock-piece-size", `${stockSize}px`);
+    root.style.setProperty("--dock-w", `${dockW}px`);
+    root.style.setProperty("--hand-piece-size", `${handSize}px`);
+
+    // 2. 4×3盤面を残りスペースいっぱいに拡大
+    const maxCellByH = Math.floor((topAvailH - 22) / 3);
+    const maxCellByW = Math.floor((topAvailW - dockW * 2 - 44) / 4);
+    const cellSize = Math.max(46, Math.min(maxCellByH, maxCellByW, 180));
+    root.style.setProperty("--cell-size", `${cellSize}px`);
+
+    // 3. 下半分の候補手グリッド（2列）に収まる最大件数を計算
+    const candsCol = document.getElementById("predCandsCol");
+    const candsH = candsCol ? candsCol.getBoundingClientRect().height : 180;
+    const rowsFit = Math.max(1, Math.floor((candsH - 22) / 40));
+    maxVisibleCandidates = rowsFit * 2;
+
+    if (lastAnalysis) {
+      renderCandidateCards(lastAnalysis, getCurrentState());
+    }
+  }
+
+  window.addEventListener("resize", () => {
+    fitToViewport();
+    // ヘッダー折り返し高さ変化に追従するため1フレーム後にも再計算
+    requestAnimationFrame(fitToViewport);
+  });
+
+  // ==========================================
+  // 5. 将棋駒型五角形＋256px画像＋方向矢印 DOM生成
+  // ==========================================
+  let dragContext = null;
+  const dragGhost = document.getElementById("dragGhost");
+
+  function createPentagonSVG(side, isPromoted) {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.classList.add("piece-pentagon-svg");
+
+    const uid = `g_${side}_${isPromoted ? "p" : "n"}_${Math.random().toString(36).slice(2, 7)}`;
+    const defs = document.createElementNS(ns, "defs");
+    const grad = document.createElementNS(ns, "linearGradient");
+    grad.setAttribute("id", uid);
+    grad.setAttribute("x1", side === SELF ? "0%" : "100%");
+    grad.setAttribute("y1", "0%");
+    grad.setAttribute("x2", side === SELF ? "100%" : "0%");
+    grad.setAttribute("y2", "100%");
+
+    const stop1 = document.createElementNS(ns, "stop");
+    stop1.setAttribute("offset", "0%");
+    const stop2 = document.createElementNS(ns, "stop");
+    stop2.setAttribute("offset", "100%");
+
+    if (isPromoted) {
+      stop1.setAttribute("stop-color", "#fef9c3");
+      stop2.setAttribute("stop-color", "#fde047");
+    } else if (side === SELF) {
+      stop1.setAttribute("stop-color", "#ffffff");
+      stop2.setAttribute("stop-color", "#bae6fd");
+    } else {
+      stop1.setAttribute("stop-color", "#ffffff");
+      stop2.setAttribute("stop-color", "#fecdd3");
+    }
+
+    grad.appendChild(stop1);
+    grad.appendChild(stop2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // 将棋駒型の五角形（自分は右尖り、敵は左尖り）
+    const poly = document.createElementNS(ns, "polygon");
+    if (side === SELF) {
+      poly.setAttribute("points", "6,10 68,10 96,50 68,90 6,90");
+    } else {
+      poly.setAttribute("points", "94,10 32,10 4,50 32,90 94,90");
+    }
+    poly.setAttribute("fill", `url(#${uid})`);
+    poly.setAttribute("stroke", isPromoted ? "#ca8a04" : (side === SELF ? "#0284c7" : "#e11d48"));
+    poly.setAttribute("stroke-width", "5.5");
+    poly.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(poly);
+
+    // 先端の進行方向矢印（▶ または ◀）をくっきり描画
+    const arrow = document.createElementNS(ns, "polygon");
+    if (side === SELF) {
+      arrow.setAttribute("points", "75,39 90,50 75,61");
+      arrow.setAttribute("fill", isPromoted ? "#b45309" : "#0284c7");
+    } else {
+      arrow.setAttribute("points", "25,39 10,50 25,61");
+      arrow.setAttribute("fill", isPromoted ? "#b45309" : "#e11d48");
+    }
+    svg.appendChild(arrow);
+
+    return svg;
+  }
+
+  function createPieceElement(side, type, variant = "board") {
+    const info = PIECE_INFO[type];
+    const isPromoted = (type === TURTLE_K);
+    const div = document.createElement("div");
+    div.className = `piece ${side === SELF ? "self" : "opp"} ${isPromoted ? "promoted" : ""}`;
+    if (variant === "stock") div.classList.add("stock-item");
+    if (variant === "hand") div.classList.add("hand-item");
+
+    // 五角形背景＋進行方向矢印SVG
+    div.appendChild(createPentagonSVG(side, isPromoted));
+
+    // 中央の256pxアイコン画像
+    const imgWrap = document.createElement("div");
+    imgWrap.className = "piece-img-wrap";
+
+    const img = document.createElement("img");
+    img.src = info.img;
+    img.alt = info.name;
+    img.className = "piece-img";
+    img.draggable = false;
+    img.onerror = () => {
+      imgWrap.innerHTML = `<span class="piece-fallback">${info.fallback}</span>`;
+    };
+    imgWrap.appendChild(img);
+    div.appendChild(imgWrap);
+
+    // 移動可能方向ドット
+    const dots = side === SELF ? info.dotsSelf : info.dotsOpp;
+    dots.forEach(dotClass => {
+      const dot = document.createElement("span");
+      dot.className = `dir-dot ${dotClass}`;
+      div.appendChild(dot);
+    });
+
+    return div;
+  }
+
+  // ==========================================
+  // 6. ドラッグ＆ドロップ制御
+  // ==========================================
+  function startPointerDrag(e, ctx) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.stopPropagation();
+
+    dragContext = {
+      ...ctx,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false
+    };
+
+    dragGhost.innerHTML = "";
+    const ghostPiece = createPieceElement(ctx.side, ctx.type, "board");
+    dragGhost.appendChild(ghostPiece);
+    dragGhost.style.left = `${e.clientX}px`;
+    dragGhost.style.top = `${e.clientY}px`;
+  }
+
+  window.addEventListener("pointermove", (e) => {
+    if (!dragContext) return;
+    const dist = Math.hypot(e.clientX - dragContext.startX, e.clientY - dragContext.startY);
+    if (!dragContext.moved && dist > 5) {
+      dragContext.moved = true;
+      dragGhost.style.display = "block";
+    }
+    if (!dragContext.moved) return;
+
+    dragGhost.style.left = `${e.clientX}px`;
+    dragGhost.style.top = `${e.clientY}px`;
+
+    document.querySelectorAll(".cell.drag-over").forEach(el => el.classList.remove("drag-over"));
+    const targetCell = getCellElementAt(e.clientX, e.clientY);
+    if (targetCell) {
+      targetCell.classList.add("drag-over");
+    }
+  });
+
+  window.addEventListener("pointerup", (e) => {
+    if (!dragContext) return;
+    const ctx = dragContext;
+    dragContext = null;
+    dragGhost.style.display = "none";
+    document.querySelectorAll(".cell.drag-over").forEach(el => el.classList.remove("drag-over"));
+
+    if (!ctx.moved) return;
+
+    const targetCell = getCellElementAt(e.clientX, e.clientY);
+    const targetIdx = targetCell ? parseInt(targetCell.dataset.idx, 10) : null;
+    const state = getCurrentState();
+
+    // 両サイドの「余りコマ(stock)」からのドラッグ → 盤面へ配置変更
+    if (ctx.source === "stock") {
+      if (targetIdx !== null) {
+        const next = cloneState(state);
+        next.board[targetIdx] = ctx.side * ctx.type;
+        replaceCurrentStateForSetup(next);
+      }
+      return;
+    }
+
+    // 「持ち駒(hand)」からのドラッグ → 持ち駒打ち
+    if (ctx.source === "hand") {
+      if (targetIdx !== null && state.winner === 0 && ctx.side === state.turn) {
+        const legals = generateMoves(state);
+        const dropMove = legals.find(m => m.drop && m.piece === ctx.type && m.to === targetIdx);
+        if (dropMove) {
+          pushNewState(applyMove(state, dropMove));
+        }
+      }
+      return;
+    }
+
+    // 盤面上の駒(board)からのドラッグ
+    if (ctx.source === "board") {
+      // 盤外へドロップ → 削除（配置変更）
+      if (targetIdx === null) {
+        const next = cloneState(state);
+        next.board[ctx.fromIdx] = EMPTY;
+        replaceCurrentStateForSetup(next);
+        return;
+      }
+
+      if (targetIdx === ctx.fromIdx) return;
+
+      // 合法手なら対局として進行
+      if (state.winner === 0 && ctx.side === state.turn) {
+        const legals = generateMoves(state);
+        const move = legals.find(m => !m.drop && m.from === ctx.fromIdx && m.to === targetIdx);
+        if (move) {
+          pushNewState(applyMove(state, move));
+          return;
+        }
+      }
+
+      // 合法手以外なら盤面配置変更として移動
+      const next = cloneState(state);
+      next.board[targetIdx] = next.board[ctx.fromIdx];
+      next.board[ctx.fromIdx] = EMPTY;
+      replaceCurrentStateForSetup(next);
+    }
+  });
+
+  function getCellElementAt(x, y) {
+    const els = document.elementsFromPoint(x, y);
+    return els.find(el => el.classList && el.classList.contains("cell")) || null;
+  }
+
+  // ==========================================
+  // 7. 盤面・両サイド縦並び余りコマ・矢印描画
+  // ==========================================
+  function initSideStocks() {
+    const types = [LEADER, WHALE, DOLPHIN, TURTLE_G, TURTLE_K];
+    const selfStock = document.getElementById("selfStockList");
+    const oppStock = document.getElementById("oppStockList");
+    selfStock.innerHTML = "";
+    oppStock.innerHTML = "";
+
+    types.forEach(type => {
+      const pSelf = createPieceElement(SELF, type, "stock");
+      pSelf.title = `盤面へドラッグして自分の${PIECE_INFO[type].name}を配置`;
+      pSelf.addEventListener("pointerdown", (e) => {
+        startPointerDrag(e, { source: "stock", side: SELF, type });
+      });
+      selfStock.appendChild(pSelf);
+
+      const pOpp = createPieceElement(OPP, type, "stock");
+      pOpp.title = `盤面へドラッグして敵の${PIECE_INFO[type].name}を配置`;
+      pOpp.addEventListener("pointerdown", (e) => {
+        startPointerDrag(e, { source: "stock", side: OPP, type });
+      });
+      oppStock.appendChild(pOpp);
+    });
+  }
+
+  function renderBoardAndHands() {
+    const state = getCurrentState();
+    const grid = document.getElementById("boardGrid");
+
+    Array.from(grid.querySelectorAll(".cell")).forEach(el => el.remove());
+
+    const activeBestMove = previewMove || (lastAnalysis && lastAnalysis.results[0] ? lastAnalysis.results[0].move : null);
+
+    for (let i = 0; i < 12; i++) {
+      const c = i % 4;
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.dataset.idx = i;
+
+      if (c === 0) cell.classList.add("zone-self");
+      if (c === 3) cell.classList.add("zone-opp");
+
+      if (selectedBoardIdx === i) cell.classList.add("selected");
+      if (state.lastMove && (state.lastMove.from === i || state.lastMove.to === i)) {
+        cell.classList.add("last-move");
+      }
+
+      const targetMove = legalTargets.find(m => m.to === i);
+      if (targetMove) {
+        cell.classList.add("legal-target");
+        if (state.board[i] !== EMPTY) {
+          cell.classList.add("legal-capture");
+        }
+      }
+
+      if (activeBestMove && activeBestMove.drop && activeBestMove.to === i) {
+        cell.classList.add("best-drop-target");
+      }
+
+      const p = state.board[i];
+      if (p !== EMPTY) {
+        const side = Math.sign(p);
+        const type = Math.abs(p);
+        const pieceEl = createPieceElement(side, type, "board");
+        pieceEl.title = `${side === SELF ? "自分" : "敵"}の${PIECE_INFO[type].name}`;
+        pieceEl.addEventListener("pointerdown", (e) => {
+          startPointerDrag(e, { source: "board", side, type, fromIdx: i });
+        });
+        cell.appendChild(pieceEl);
+      }
+
+      cell.addEventListener("click", () => handleCellClick(i));
+
+      cell.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        if (state.board[i] !== EMPTY) {
+          const next = cloneState(state);
+          next.board[i] = EMPTY;
+          replaceCurrentStateForSetup(next);
+        }
+      });
+
+      grid.insertBefore(cell, document.getElementById("arrowOverlay"));
+    }
+
+    renderHandList("selfHandList", SELF, state.handSelf, activeBestMove);
+    renderHandList("oppHandList", OPP, state.handOpp, activeBestMove);
+
+    const pill = document.getElementById("turnPill");
+    const turnText = document.getElementById("turnText");
+    pill.className = "turn-pill";
+    if (state.winner !== 0) {
+      pill.classList.add("turn-win");
+      const wName = state.winner === SELF ? "🔵 自分" : "🔴 敵";
+      turnText.textContent = `🏆 ${wName}の勝利（${state.winReason}）`;
+    } else if (state.turn === SELF) {
+      pill.classList.add("turn-self");
+      turnText.textContent = "🔵 自分の手番（▶右進）";
+    } else {
+      pill.classList.add("turn-opp");
+      turnText.textContent = "🔴 敵の手番（◀左進）";
+    }
+
+    document.getElementById("undoBtn").disabled = historyIndex === 0;
+    renderArrows(activeBestMove);
+  }
+
+  function renderHandList(containerId, side, handObj, activeBestMove) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+    const state = getCurrentState();
+
+    [WHALE, DOLPHIN, TURTLE_G].forEach(type => {
+      const count = handObj[type];
+      if (count <= 0) return;
+
+      const slot = document.createElement("div");
+      slot.className = "hand-slot";
+      slot.title = `持ち駒: ${PIECE_INFO[type].name} ×${count}（クリックまたはドラッグで打つ）`;
+      if (selectedHandType === type && state.turn === side) {
+        slot.classList.add("selected");
+      }
+      if (activeBestMove && activeBestMove.drop && state.turn === side && activeBestMove.piece === type) {
+        slot.classList.add("best-drop");
+      }
+
+      const pEl = createPieceElement(side, type, "hand");
+      pEl.addEventListener("pointerdown", (e) => {
+        startPointerDrag(e, { source: "hand", side, type });
+      });
+      slot.appendChild(pEl);
+
+      const badge = document.createElement("span");
+      badge.className = "count-badge";
+      badge.textContent = count;
+      slot.appendChild(badge);
+
+      slot.addEventListener("click", () => handleHandClick(side, type));
+      container.appendChild(slot);
+    });
+
+    if (container.children.length === 0) {
+      const none = document.createElement("span");
+      none.style.fontSize = "0.62rem";
+      none.style.color = "var(--text-muted)";
+      none.textContent = "なし";
+      container.appendChild(none);
+    }
+  }
+
+  function renderArrows(bestMove) {
+    const layer = document.getElementById("arrowLayer");
+    layer.innerHTML = "";
+    if (!bestMove) return;
+
+    const toR = Math.floor(bestMove.to / 4);
+    const toC = bestMove.to % 4;
+    const x2 = (toC + 0.5) * 100;
+    const y2 = (toR + 0.5) * 100;
+
+    if (bestMove.drop) {
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", x2);
+      circle.setAttribute("cy", y2);
+      circle.setAttribute("r", "34");
+      circle.setAttribute("fill", "none");
+      circle.setAttribute("stroke", "#10b981");
+      circle.setAttribute("stroke-width", "5");
+      circle.setAttribute("stroke-dasharray", "8 4");
+      layer.appendChild(circle);
+
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", x2);
+      text.setAttribute("y", y2 + 5);
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("fill", "#10b981");
+      text.setAttribute("font-size", "15");
+      text.setAttribute("font-weight", "bold");
+      text.textContent = `${PIECE_INFO[bestMove.piece].name}打`;
+      layer.appendChild(text);
+    } else {
+      const fromR = Math.floor(bestMove.from / 4);
+      const fromC = bestMove.from % 4;
+      const x1 = (fromC + 0.5) * 100;
+      const y1 = (fromR + 0.5) * 100;
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      const adjX2 = x2 - (dx / len) * 18;
+      const adjY2 = y2 - (dy / len) * 18;
+
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", adjX2);
+      line.setAttribute("y2", adjY2);
+      line.setAttribute("stroke", previewMove ? "#38bdf8" : "#10b981");
+      line.setAttribute("stroke-width", "8");
+      line.setAttribute("stroke-linecap", "round");
+      line.setAttribute("opacity", "0.9");
+      line.setAttribute("marker-end", previewMove ? "url(#ah-sub)" : "url(#ah-best)");
+      layer.appendChild(line);
+    }
+  }
+
+  // ==========================================
+  // 8. クリック操作ハンドラ
+  // ==========================================
+  function handleCellClick(idx) {
+    const state = getCurrentState();
+    if (state.winner !== 0) return;
+
+    const chosenMove = legalTargets.find(m => m.to === idx);
+    if (chosenMove) {
+      pushNewState(applyMove(state, chosenMove));
+      return;
+    }
+
+    const p = state.board[idx];
+    if (p !== EMPTY && Math.sign(p) === state.turn) {
+      if (selectedBoardIdx === idx) {
+        clearSelection();
+      } else {
+        selectedBoardIdx = idx;
+        selectedHandType = null;
+        legalTargets = generateMoves(state).filter(m => !m.drop && m.from === idx);
+      }
+      renderBoardAndHands();
+      return;
+    }
+
+    clearSelection();
+    renderBoardAndHands();
+  }
+
+  function handleHandClick(side, type) {
+    const state = getCurrentState();
+    if (state.winner !== 0 || side !== state.turn) return;
+
+    if (selectedHandType === type) {
+      clearSelection();
+    } else {
+      selectedHandType = type;
+      selectedBoardIdx = null;
+      legalTargets = generateMoves(state).filter(m => m.drop && m.piece === type);
+    }
+    renderBoardAndHands();
+  }
+
+  // ==========================================
+  // 9. 下半分：手の予測＆候補手レンダリング
+  // ==========================================
+  function formatEvalText(score, turn) {
+    const selfScore = turn === SELF ? score : -score;
+    if (Math.abs(score) > MATE_SCORE - 100) {
+      const plies = MATE_SCORE - Math.abs(score);
+      const who = selfScore > 0 ? "🔵 自分" : "🔴 敵";
+      return {
+        text: `${who} ${plies}手勝ち！`,
+        cls: selfScore > 0 ? "score-win" : "score-lose",
+        pct: selfScore > 0 ? 100 : 0
+      };
+    }
+
+    const sign = selfScore > 0 ? "+" : "";
+    let label = "互角";
+    if (selfScore >= 300) label = "自分優勢";
+    else if (selfScore >= 120) label = "自分やや有利";
+    else if (selfScore <= -300) label = "敵優勢";
+    else if (selfScore <= -120) label = "敵やや有利";
+
+    const pct = Math.max(5, Math.min(95, 50 + (selfScore / 15)));
+    return {
+      text: `${label} (${sign}${selfScore})`,
+      cls: selfScore > 100 ? "score-win" : (selfScore < -100 ? "score-lose" : "score-even"),
+      pct
+    };
+  }
+
+  function triggerAnalysis() {
+    const state = getCurrentState();
+    previewMove = null;
+
+    const hasSelfLeader = state.board.includes(SELF * LEADER);
+    const hasOppLeader = state.board.includes(OPP * LEADER);
+
+    if (!hasSelfLeader || !hasOppLeader) {
+      lastAnalysis = null;
+      document.getElementById("evalScoreText").textContent = "配置待機中";
+      document.getElementById("evalScoreText").className = "eval-score score-even";
+      document.getElementById("evalBarFill").style.width = "50%";
+      document.getElementById("bestCaption").textContent = "盤面セットアップ";
+      document.getElementById("bestMoveVal").textContent = "両サイドから双方のリーダーを盤面へドラッグしてください";
+      document.getElementById("pvSteps").innerHTML = "";
+      document.getElementById("candidatesList").innerHTML = "";
+      document.getElementById("statsLine").textContent = "準備完了後に自動予測します";
+      renderBoardAndHands();
+      return;
+    }
+
+    if (state.winner !== 0) {
+      lastAnalysis = null;
+      const winStr = state.winner === SELF ? "🔵 自分の勝利" : "🔴 敵の勝利";
+      document.getElementById("evalScoreText").textContent = `${winStr} (${state.winReason})`;
+      document.getElementById("evalScoreText").className = `eval-score ${state.winner === SELF ? "score-win" : "score-lose"}`;
+      document.getElementById("evalBarFill").style.width = state.winner === SELF ? "100%" : "0%";
+      document.getElementById("bestMoveVal").textContent = "対局終了";
+      document.getElementById("pvSteps").innerHTML = "";
+      document.getElementById("candidatesList").innerHTML = "";
+      renderBoardAndHands();
+      return;
+    }
+
+    const maxDepth = parseInt(document.getElementById("depthSelect").value, 10);
+    document.getElementById("evalScoreText").textContent = "先読み計算中...";
+
+    setTimeout(() => {
+      const analysis = analyzePosition(state, maxDepth);
+      lastAnalysis = analysis;
+
+      document.getElementById("statsLine").textContent =
+        `深さ:${analysis.reachedDepth}手 | 探索:${analysis.nodes.toLocaleString()}局面 | ${analysis.elapsed}ms`;
+
+      if (analysis.results.length === 0) {
+        document.getElementById("evalScoreText").textContent = "合法手なし（負け）";
+        document.getElementById("bestMoveVal").textContent = "打てる手がありません";
+        renderBoardAndHands();
+        return;
+      }
+
+      const best = analysis.results[0];
+      const evalInfo = formatEvalText(best.score, state.turn);
+
+      const scoreEl = document.getElementById("evalScoreText");
+      scoreEl.textContent = evalInfo.text;
+      scoreEl.className = `eval-score ${evalInfo.cls}`;
+      document.getElementById("evalBarFill").style.width = `${evalInfo.pct}%`;
+
+      document.getElementById("bestCaption").textContent =
+        state.turn === SELF ? "🔵 自分の最善手（敵の応手まで読んだ予測）" : "🔴 敵の最善手（予想される次の手）";
+      document.getElementById("bestMoveVal").textContent = formatMove(best.move, state.turn);
+
+      const pvBox = document.getElementById("pvSteps");
+      pvBox.innerHTML = "";
+      let simSide = state.turn;
+      best.pv.slice(0, 8).forEach((m, idx) => {
+        const chip = document.createElement("span");
+        chip.className = `pv-chip ${simSide === SELF ? "s-self" : "s-opp"}`;
+        chip.textContent = `${idx + 1}.${formatMove(m, simSide)}`;
+        pvBox.appendChild(chip);
+        simSide = -simSide;
+      });
+
+      renderCandidateCards(analysis, state);
+      renderBoardAndHands();
+    }, 12);
+  }
+
+  function renderCandidateCards(analysis, state) {
+    const listEl = document.getElementById("candidatesList");
+    listEl.innerHTML = "";
+    const bestMove = analysis.results[0] ? analysis.results[0].move : null;
+
+    analysis.results.slice(0, maxVisibleCandidates).forEach((item, idx) => {
+      const card = document.createElement("div");
+      card.className = `cand-card ${idx === 0 ? "top1" : ""}`;
+
+      const itemEval = formatEvalText(item.score, state.turn);
+      let pvStr = "";
+      let s = state.turn;
+      item.pv.slice(0, 5).forEach((m, i) => {
+        pvStr += `${i > 0 ? "→" : ""}${formatMove(m, s)}`;
+        s = -s;
+      });
+
+      card.innerHTML = `
+        <div class="cand-top">
+          <span class="cand-move-name">#${idx + 1} ${formatMove(item.move, state.turn)}</span>
+          <span class="${itemEval.cls}" style="font-size:0.72rem; flex-shrink:0;">${itemEval.text}</span>
+        </div>
+        <div class="cand-pv">読み: ${pvStr}</div>
+      `;
+
+      card.addEventListener("mouseenter", () => {
+        previewMove = item.move;
+        renderArrows(previewMove);
+      });
+      card.addEventListener("mouseleave", () => {
+        previewMove = null;
+        renderArrows(bestMove);
+      });
+      card.addEventListener("click", () => {
+        pushNewState(applyMove(state, item.move));
+      });
+
+      listEl.appendChild(card);
+    });
+  }
+
+  function renderHistory() {
+    const box = document.getElementById("historyItems");
+    box.innerHTML = "";
+
+    const startIdx = Math.max(0, history.length - 8);
+    for (let idx = startIdx; idx < history.length; idx++) {
+      const st = history[idx];
+      const chip = document.createElement("div");
+      chip.className = `history-chip ${idx === historyIndex ? "current" : ""}`;
+      if (idx === 0) {
+        chip.textContent = "開始";
+      } else {
+        const moverSide = history[idx - 1].turn;
+        chip.textContent = `${idx}.${formatMove(st.lastMove, moverSide)}`;
+      }
+      chip.addEventListener("click", () => {
+        historyIndex = idx;
+        clearSelection();
+        renderAll();
+        triggerAnalysis();
+      });
+      box.appendChild(chip);
+    }
+  }
+
+  function renderAll() {
+    renderBoardAndHands();
+    renderHistory();
+  }
+
+  // ==========================================
+  // 10. ボタンイベント & 初期化
+  // ==========================================
+  const rulesBtn = document.getElementById("rulesToggleBtn");
+  const rulesPopover = document.getElementById("rulesPopover");
+
+  rulesBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    rulesPopover.classList.toggle("open");
+  });
+
+  window.addEventListener("click", (e) => {
+    if (!rulesPopover.contains(e.target) && e.target !== rulesBtn) {
+      rulesPopover.classList.remove("open");
+    }
+  });
+
+  document.getElementById("undoBtn").addEventListener("click", () => {
+    if (historyIndex > 0) {
+      historyIndex--;
+      clearSelection();
+      renderAll();
+      triggerAnalysis();
+    }
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    history = [createInitialState()];
+    historyIndex = 0;
+    clearSelection();
+    renderAll();
+    triggerAnalysis();
+  });
+
+  document.getElementById("clearBoardBtn").addEventListener("click", () => {
+    const emptyState = {
+      board: Array(12).fill(EMPTY),
+      handSelf: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
+      handOpp: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
+      turn: getCurrentState().turn,
+      lastMove: null,
+      winner: 0,
+      winReason: ""
+    };
+    replaceCurrentStateForSetup(emptyState);
+  });
+
+  document.getElementById("switchTurnBtn").addEventListener("click", () => {
+    const state = getCurrentState();
+    if (state.winner !== 0) return;
+    const next = cloneState(state);
+    next.turn = -next.turn;
+    history[historyIndex] = next;
+    clearSelection();
+    renderAll();
+    triggerAnalysis();
+  });
+
+  document.getElementById("depthSelect").addEventListener("change", () => {
+    triggerAnalysis();
+  });
+
+  initSideStocks();
+  renderAll();
+  fitToViewport();
+  triggerAnalysis();
+})();
+</script>
+</body>
+</html>
