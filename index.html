@@ -19,7 +19,7 @@
     --board-bg: #e7c697;
     --board-line: #8c6239;
 
-    /* JSで画面サイズに応じて動的計算される変数 */
+    /* JSで画面サイズ・マス目数に応じて動的計算される変数 */
     --cell-size: 98px;
     --dock-w: 84px;
     --stock-piece-size: 42px;
@@ -54,7 +54,7 @@
   }
 
   /* =========================================
-     最上部コントロールバー（重なり防止・自動折り返し対応）
+     最上部コントロールバー
      ========================================= */
   header {
     display: flex;
@@ -115,6 +115,17 @@
     color: #a7f3d0;
   }
 
+  .btn-size-trigger {
+    background: rgba(2, 132, 199, 0.22);
+    border: 1px solid #38bdf8;
+    color: #e0f2fe;
+    font-weight: 700;
+  }
+
+  .btn-size-trigger:hover {
+    background: rgba(2, 132, 199, 0.38);
+  }
+
   button, select {
     background: var(--bg-card);
     color: var(--text-main);
@@ -155,6 +166,179 @@
 
   button.btn-danger:hover:not(:disabled) {
     background: #7f1d1d;
+  }
+
+  /* =========================================
+     画面中央マス目設定ポップアップ（モーダル）
+     ========================================= */
+  .modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.68);
+    backdrop-filter: blur(2px);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .size-popover {
+    position: relative;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.78);
+    width: 310px;
+    max-width: 100%;
+    animation: modalPopIn 0.14s ease-out;
+  }
+
+  @keyframes modalPopIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .popover-title {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #38bdf8;
+  }
+
+  .btn-close-modal {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 2px 6px;
+    line-height: 1;
+    border-radius: 6px;
+  }
+
+  .btn-close-modal:hover {
+    background: rgba(51, 65, 85, 0.7);
+    color: #fff;
+  }
+
+  .preset-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .preset-size-btn {
+    flex: 1;
+    padding: 7px 8px;
+    background: var(--bg-card);
+    border: 1px solid #475569;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #f8fafc;
+    text-align: center;
+  }
+
+  .preset-size-btn:hover {
+    background: #334155;
+    border-color: #38bdf8;
+  }
+
+  .preset-size-btn.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+  }
+
+  .custom-size-box {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .custom-size-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .size-inputs-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .input-field-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+  }
+
+  .input-field-wrap span {
+    font-size: 0.66rem;
+    color: #94a3b8;
+    margin-bottom: 3px;
+  }
+
+  .size-text-input {
+    width: 100%;
+    background: #0f172a;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    color: #f8fafc;
+    font-size: 0.95rem;
+    font-weight: 800;
+    text-align: center;
+    padding: 6px 4px;
+    outline: none;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .size-text-input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+  }
+
+  .size-x-mark {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #cbd5e1;
+    margin-top: 14px;
+  }
+
+  .btn-apply-size {
+    margin-top: 14px;
+    padding: 7px 14px;
+    background: #10b981;
+    border-color: #34d399;
+    color: #064e3b;
+    font-weight: 800;
+  }
+
+  .btn-apply-size:hover {
+    background: #059669;
+    color: #fff;
   }
 
   /* ルール確認ポップオーバー */
@@ -302,7 +486,7 @@
     min-height: calc(var(--hand-piece-size) + 4px);
   }
 
-  /* 中央盤面（4列×3行） */
+  /* 中央盤面（可変サイズ対応） */
   .board-center {
     display: flex;
     flex-direction: column;
@@ -313,13 +497,18 @@
 
   .col-coords {
     display: grid;
-    grid-template-columns: repeat(4, var(--cell-size));
     text-align: center;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-weight: 700;
     color: var(--text-muted);
     margin-bottom: 2px;
     padding-right: 16px;
+  }
+
+  .col-coords div {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .board-row-wrap {
@@ -330,10 +519,6 @@
   .board-grid {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(4, var(--cell-size));
-    grid-template-rows: repeat(3, var(--cell-size));
-    width: calc(var(--cell-size) * 4);
-    height: calc(var(--cell-size) * 3);
     background: var(--board-bg);
     border: 3px solid var(--board-line);
     border-radius: 6px;
@@ -342,7 +527,6 @@
 
   .row-coords {
     display: grid;
-    grid-template-rows: repeat(3, var(--cell-size));
     align-items: center;
     justify-items: center;
     width: 16px;
@@ -830,12 +1014,6 @@
   }
 </style>
 </head>
-  <script async src="https://www.googletagmanager.com/gtm.js?id=GTM-5WXXHQQ3"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-</script>
 <body>
 
 <div id="app">
@@ -847,6 +1025,9 @@
         <span id="turnText">🔵 自分の手番（▶右進）</span>
         <button id="switchTurnBtn" style="padding:2px 7px; font-size:0.7rem;">手番切替</button>
       </div>
+
+      <!-- マス目設定ポップアップトリガー -->
+      <button type="button" id="sizePopoverBtn" class="btn-size-trigger">📐 マス目: <span id="currentSizeLabel">4×3</span></button>
     </div>
 
     <div class="header-group">
@@ -887,7 +1068,8 @@
         <div><strong>金カメ</strong>：斜め後ろ以外の6方向に1マス</div>
       </div>
       <div style="font-size:0.72rem; color:#cbd5e1; margin-top:6px; line-height:1.45;">
-        ・<strong>初期配置調整</strong>：左右の「余りコマ」を盤面へドラッグで配置、<strong>「持ち駒」枠へドラッグ</strong>で最初から持つ余りコマに追加できます。<br>
+        ・<strong>マス目変更</strong>：上部の「📐 マス目」からプリセット（4×3 / 4×4）または横×縦の数値入力で変更可能。<br>
+        ・<strong>初期配置調整</strong>：左右の「余りコマ」を盤面へドラッグで配置、「持ち駒」枠へドラッグで最初から持つ余りコマに追加。<br>
         ・<strong>削除</strong>：盤上や持ち駒を枠外へドラッグ（または右クリック）で削除。
       </div>
     </div>
@@ -908,14 +1090,9 @@
       </div>
     </div>
 
-    <!-- 中央：4列×3行 横向き盤面 -->
+    <!-- 中央：可変サイズの横向き盤面 -->
     <div class="board-center">
-      <div class="col-coords">
-        <div>1（自陣）</div>
-        <div>2</div>
-        <div>3</div>
-        <div>4（敵陣）</div>
-      </div>
+      <div class="col-coords" id="colCoords"></div>
       <div class="board-row-wrap">
         <div class="board-grid" id="boardGrid">
           <svg id="arrowOverlay" class="arrow-overlay" viewBox="0 0 400 300">
@@ -933,11 +1110,7 @@
             <g id="arrowLayer"></g>
           </svg>
         </div>
-        <div class="row-coords">
-          <div>一</div>
-          <div>二</div>
-          <div>三</div>
-        </div>
+        <div class="row-coords" id="rowCoords"></div>
       </div>
     </div>
 
@@ -995,13 +1168,46 @@
   </section>
 </div>
 
+<!-- 画面中央マス目設定ポップアップ（モーダル） -->
+<div id="sizeModalBackdrop" class="modal-backdrop">
+  <div id="sizePopover" class="size-popover" role="dialog" aria-modal="true" aria-labelledby="sizeModalTitle">
+    <div class="popover-header">
+      <div id="sizeModalTitle" class="popover-title">📐 盤面のマス目変更</div>
+      <button type="button" id="closeSizeModalBtn" class="btn-close-modal" aria-label="閉じる">✕</button>
+    </div>
+
+    <!-- プリセットボタン（クリックで下のテキストボックスへ自動入力＆適用） -->
+    <div class="preset-row">
+      <button type="button" class="preset-size-btn active" data-cols="4" data-rows="3">4×3（初期値）</button>
+      <button type="button" class="preset-size-btn" data-cols="4" data-rows="4">4×4</button>
+    </div>
+
+    <!-- テキストボックス入力（×の前後2つに分割） -->
+    <div class="custom-size-box">
+      <span class="custom-size-label">任意のマス目を直接入力（2〜10）：</span>
+      <div class="size-inputs-row">
+        <div class="input-field-wrap">
+          <span>横（列）</span>
+          <input type="text" inputmode="numeric" id="colsInput" class="size-text-input" value="4" maxlength="2" aria-label="横のマス数">
+        </div>
+        <span class="size-x-mark">×</span>
+        <div class="input-field-wrap">
+          <span>縦（行）</span>
+          <input type="text" inputmode="numeric" id="rowsInput" class="size-text-input" value="3" maxlength="2" aria-label="縦のマス数">
+        </div>
+        <button type="button" id="applySizeBtn" class="btn-apply-size">適用</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ドラッグ追従ゴースト -->
 <div id="dragGhost"></div>
 
 <script>
 (() => {
   // ==========================================
-  // 1. 定数・横向き盤面定義（4列×3行）
+  // 1. 定数・可変盤面定義（初期値：横4 × 縦3）
   // ==========================================
   const SELF = 1;
   const OPP = -1;
@@ -1012,6 +1218,9 @@
   const DOLPHIN = 3;   // イルカ
   const TURTLE_G = 4;  // カメ
   const TURTLE_K = 5;  // 金カメ
+
+  let boardCols = 4; // 横（列）初期値: 4
+  let boardRows = 3; // 縦（行）初期値: 3
 
   const PIECE_INFO = {
     [LEADER]: {
@@ -1061,16 +1270,75 @@
     }
   };
 
-  const COL_LABELS = ["1", "2", "3", "4"];
-  const ROW_LABELS = ["一", "二", "三"];
+  const KANJI_ROWS = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
 
-  function createInitialState() {
-    const board = [
-       DOLPHIN,  EMPTY,     EMPTY,    -WHALE,
-       LEADER,   TURTLE_G, -TURTLE_G, -LEADER,
-       WHALE,    EMPTY,     EMPTY,    -DOLPHIN
-    ];
+  function getColLabel(c) {
+    return String(c + 1);
+  }
+
+  function getRowLabel(r) {
+    return KANJI_ROWS[r] || String(r + 1);
+  }
+
+  function createInitialState(cols = boardCols, rows = boardRows) {
+    const board = Array(cols * rows).fill(EMPTY);
+    const set = (r, c, piece) => {
+      if (r >= 0 && r < rows && c >= 0 && c < cols) {
+        board[r * cols + c] = piece;
+      }
+    };
+
+    if (rows === 3) {
+      // 3行盤面（4×3など）の標準配置
+      set(0, 0, DOLPHIN);
+      set(1, 0, LEADER);
+      set(2, 0, WHALE);
+      if (cols >= 4) set(1, 1, TURTLE_G);
+
+      set(0, cols - 1, -WHALE);
+      set(1, cols - 1, -LEADER);
+      set(2, cols - 1, -DOLPHIN);
+      if (cols >= 4) set(1, cols - 2, -TURTLE_G);
+    } else if (rows === 4) {
+      // 4行盤面（4×4など）のバランス配置
+      set(0, 0, DOLPHIN);
+      set(1, 0, LEADER);
+      set(2, 0, WHALE);
+      set(3, 0, DOLPHIN);
+      if (cols >= 4) {
+        set(1, 1, TURTLE_G);
+        set(2, 1, TURTLE_G);
+      }
+
+      set(0, cols - 1, -DOLPHIN);
+      set(1, cols - 1, -WHALE);
+      set(2, cols - 1, -LEADER);
+      set(3, cols - 1, -DOLPHIN);
+      if (cols >= 4) {
+        set(1, cols - 2, -TURTLE_G);
+        set(2, cols - 2, -TURTLE_G);
+      }
+    } else {
+      // その他の任意マス数（2〜10）の汎用対称配置
+      const mid = Math.floor(rows / 2);
+      set(mid, 0, LEADER);
+      if (cols >= 4) set(mid, 1, TURTLE_G);
+      if (mid - 1 >= 0) set(mid - 1, 0, DOLPHIN);
+      if (mid + 1 < rows) set(mid + 1, 0, WHALE);
+      if (mid - 2 >= 0) set(mid - 2, 0, WHALE);
+      if (mid + 2 < rows) set(mid + 2, 0, DOLPHIN);
+
+      set(mid, cols - 1, -LEADER);
+      if (cols >= 4) set(mid, cols - 2, -TURTLE_G);
+      if (mid - 1 >= 0) set(mid - 1, cols - 1, -WHALE);
+      if (mid + 1 < rows) set(mid + 1, cols - 1, -DOLPHIN);
+      if (mid - 2 >= 0) set(mid - 2, cols - 1, -DOLPHIN);
+      if (mid + 2 < rows) set(mid + 2, cols - 1, -WHALE);
+    }
+
     return {
+      cols,
+      rows,
       board,
       handSelf: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
       handOpp:  { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
@@ -1083,6 +1351,8 @@
 
   function cloneState(s) {
     return {
+      cols: s.cols,
+      rows: s.rows,
       board: s.board.slice(),
       handSelf: { ...s.handSelf },
       handOpp: { ...s.handOpp },
@@ -1094,18 +1364,19 @@
   }
 
   // ==========================================
-  // 2. ルールエンジン
+  // 2. ルールエンジン（可変 cols × rows 対応）
   // ==========================================
-  function isSquareAttacked(board, targetIdx, attackerSide) {
-    const tr = Math.floor(targetIdx / 4);
-    const tc = targetIdx % 4;
+  function isSquareAttacked(board, cols, rows, targetIdx, attackerSide) {
+    const tr = Math.floor(targetIdx / cols);
+    const tc = targetIdx % cols;
+    const total = cols * rows;
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < total; i++) {
       const p = board[i];
       if (p === EMPTY || Math.sign(p) !== attackerSide) continue;
       const type = Math.abs(p);
-      const r = Math.floor(i / 4);
-      const c = i % 4;
+      const r = Math.floor(i / cols);
+      const c = i % cols;
       const dirs = PIECE_INFO[type].dirs;
 
       for (let d = 0; d < dirs.length; d++) {
@@ -1119,27 +1390,28 @@
 
   function generateMoves(state) {
     if (state.winner !== 0) return [];
-    const { board, turn } = state;
+    const { board, turn, cols, rows } = state;
+    const total = cols * rows;
     const hand = turn === SELF ? state.handSelf : state.handOpp;
     const moves = [];
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < total; i++) {
       const p = board[i];
       if (p === EMPTY || Math.sign(p) !== turn) continue;
       const type = Math.abs(p);
-      const r = Math.floor(i / 4);
-      const c = i % 4;
+      const r = Math.floor(i / cols);
+      const c = i % cols;
       const dirs = PIECE_INFO[type].dirs;
 
       for (let d = 0; d < dirs.length; d++) {
         const nr = r + dirs[d][0] * turn;
         const nc = c + dirs[d][1] * turn;
-        if (nr < 0 || nr >= 3 || nc < 0 || nc >= 4) continue;
-        const to = nr * 4 + nc;
+        if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+        const to = nr * cols + nc;
         const target = board[to];
         if (target !== EMPTY && Math.sign(target) === turn) continue;
 
-        const promoteZone = (turn === SELF && nc === 3) || (turn === OPP && nc === 0);
+        const promoteZone = (turn === SELF && nc === cols - 1) || (turn === OPP && nc === 0);
         const promote = (type === TURTLE_G && promoteZone);
 
         moves.push({
@@ -1155,7 +1427,7 @@
 
     for (const type of [WHALE, DOLPHIN, TURTLE_G]) {
       if (hand[type] > 0) {
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < total; i++) {
           if (board[i] === EMPTY) {
             moves.push({
               from: -1,
@@ -1175,7 +1447,7 @@
 
   function applyMove(state, move) {
     const next = cloneState(state);
-    const turn = state.turn;
+    const { turn, cols, rows } = state;
     const hand = turn === SELF ? next.handSelf : next.handOpp;
 
     if (move.drop) {
@@ -1204,9 +1476,9 @@
 
     const leaderPos = next.board.indexOf(turn * LEADER);
     if (leaderPos !== -1) {
-      const lc = leaderPos % 4;
-      const inEnemyBack = (turn === SELF && lc === 3) || (turn === OPP && lc === 0);
-      if (inEnemyBack && !isSquareAttacked(next.board, leaderPos, -turn)) {
+      const lc = leaderPos % cols;
+      const inEnemyBack = (turn === SELF && lc === cols - 1) || (turn === OPP && lc === 0);
+      if (inEnemyBack && !isSquareAttacked(next.board, cols, rows, leaderPos, -turn)) {
         next.winner = turn;
         next.winReason = "トライ成立！";
       }
@@ -1217,12 +1489,12 @@
     return next;
   }
 
-  function formatMove(move, side) {
+  function formatMove(move, side, cols = boardCols) {
     if (!move) return "";
     const prefix = side === SELF ? "🔵" : "🔴";
-    const toR = Math.floor(move.to / 4);
-    const toC = move.to % 4;
-    const coord = `${COL_LABELS[toC]}${ROW_LABELS[toR]}`;
+    const toR = Math.floor(move.to / cols);
+    const toC = move.to % cols;
+    const coord = `${getColLabel(toC)}${getRowLabel(toR)}`;
     const pName = PIECE_INFO[move.piece].name;
     if (move.drop) return `${prefix}${coord}${pName}打`;
     return `${prefix}${coord}${pName}${move.promote ? "成" : ""}`;
@@ -1239,7 +1511,8 @@
   let searchAborted = false;
 
   function getStateHash(state) {
-    return state.board.join(",") + "|" +
+    return `${state.cols}x${state.rows}|` +
+      state.board.join(",") + "|" +
       state.handSelf[2] + state.handSelf[3] + state.handSelf[4] + "|" +
       state.handOpp[2] + state.handOpp[3] + state.handOpp[4] + "|" +
       state.turn;
@@ -1251,27 +1524,28 @@
     }
 
     let score = 0;
-    const b = state.board;
+    const { board: b, cols, rows } = state;
+    const total = cols * rows;
 
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < total; i++) {
       const p = b[i];
       if (p === EMPTY) continue;
       const side = Math.sign(p);
       const type = Math.abs(p);
-      const r = Math.floor(i / 4);
-      const c = i % 4;
+      const r = Math.floor(i / cols);
+      const c = i % cols;
 
       let val = PIECE_INFO[type].val;
 
       if (type === LEADER) {
-        const advance = side === SELF ? c : (3 - c);
+        const advance = side === SELF ? c : (cols - 1 - c);
         val += advance * 28;
-        if (r === 1) val += 10;
+        if (r > 0 && r < rows - 1) val += 10;
       } else if (type === TURTLE_G) {
-        const advance = side === SELF ? c : (3 - c);
+        const advance = side === SELF ? c : (cols - 1 - c);
         val += advance * 25;
       } else {
-        if (r === 1 && (c === 1 || c === 2)) val += 18;
+        if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) val += 18;
       }
 
       score += side * val;
@@ -1470,9 +1744,9 @@
   }
 
   // ==========================================
-  // 4. UI状態管理 & 動的リサイズ（スクロール完全防止）
+  // 4. UI状態管理 & 動的リサイズ（可変マス数・スクロール防止）
   // ==========================================
-  let history = [createInitialState()];
+  let history = [createInitialState(boardCols, boardRows)];
   let historyIndex = 0;
 
   let selectedBoardIdx = null;
@@ -1480,7 +1754,7 @@
   let legalTargets = [];
 
   let lastAnalysis = null;
-  let previewItem = null; // { move, pv }
+  let previewItem = null;
   let maxVisibleCandidates = 8;
 
   function getCurrentState() {
@@ -1513,19 +1787,49 @@
     legalTargets = [];
   }
 
+  function syncSizePopoverUI() {
+    document.getElementById("currentSizeLabel").textContent = `${boardCols}×${boardRows}`;
+    document.getElementById("colsInput").value = boardCols;
+    document.getElementById("rowsInput").value = boardRows;
+
+    document.querySelectorAll(".preset-size-btn").forEach(btn => {
+      const c = parseInt(btn.dataset.cols, 10);
+      const r = parseInt(btn.dataset.rows, 10);
+      btn.classList.toggle("active", c === boardCols && r === boardRows);
+    });
+  }
+
+  function changeBoardSize(newCols, newRows) {
+    const safeCols = Math.max(2, Math.min(10, parseInt(newCols, 10) || 4));
+    const safeRows = Math.max(2, Math.min(10, parseInt(newRows, 10) || 3));
+
+    boardCols = safeCols;
+    boardRows = safeRows;
+    transpositionTable.clear();
+    syncSizePopoverUI();
+
+    history = [createInitialState(boardCols, boardRows)];
+    historyIndex = 0;
+    clearSelection();
+    fitToViewport();
+    renderAll();
+    triggerAnalysis();
+  }
+
   function fitToViewport() {
     const root = document.documentElement;
+    const state = getCurrentState();
+    const cols = state ? state.cols : boardCols;
+    const rows = state ? state.rows : boardRows;
 
     const topHalfEl = document.getElementById("topHalf");
     const topRect = topHalfEl.getBoundingClientRect();
     const topAvailH = Math.max(160, topRect.height - 14);
     const topAvailW = Math.max(320, topRect.width - 24);
 
-    // 1. 縦1列の5種類の余りコマ + 持ち駒エリアがドック高さに収まるサイズ計算
+    // 1. 両サイドドックのサイズ計算
     const fixedDockChrome = 72;
     const stockSize = Math.max(20, Math.min(46, Math.floor((topAvailH - fixedDockChrome - 24) / 6)));
-
-    // 縦1列なのでドック幅をスリムに保ちつつ持ち駒ドロップ領域を確保
     const dockW = Math.max(76, Math.min(104, stockSize + 38));
     const handSize = Math.max(20, Math.min(28, Math.floor((dockW - 18) / 3)));
 
@@ -1533,10 +1837,10 @@
     root.style.setProperty("--dock-w", `${dockW}px`);
     root.style.setProperty("--hand-piece-size", `${handSize}px`);
 
-    // 2. 4×3盤面を残りスペースいっぱいに拡大
-    const maxCellByH = Math.floor((topAvailH - 22) / 3);
-    const maxCellByW = Math.floor((topAvailW - dockW * 2 - 44) / 4);
-    const cellSize = Math.max(46, Math.min(maxCellByH, maxCellByW, 180));
+    // 2. cols × rows 盤面を残りスペースいっぱいに自動スケーリング
+    const maxCellByH = Math.floor((topAvailH - 22) / rows);
+    const maxCellByW = Math.floor((topAvailW - dockW * 2 - 44) / cols);
+    const cellSize = Math.max(30, Math.min(maxCellByH, maxCellByW, 180));
     root.style.setProperty("--cell-size", `${cellSize}px`);
 
     // 3. 下半分の候補手グリッド（2列）に収まる最大件数を計算
@@ -1598,7 +1902,6 @@
     defs.appendChild(grad);
     svg.appendChild(defs);
 
-    // 将棋駒型の五角形（自分は右尖り、敵は左尖り）
     const poly = document.createElementNS(ns, "polygon");
     if (side === SELF) {
       poly.setAttribute("points", "6,10 68,10 96,50 68,90 6,90");
@@ -1611,7 +1914,6 @@
     poly.setAttribute("stroke-linejoin", "round");
     svg.appendChild(poly);
 
-    // 先端の進行方向矢印
     const arrow = document.createElementNS(ns, "polygon");
     if (side === SELF) {
       arrow.setAttribute("points", "75,39 90,50 75,61");
@@ -1727,19 +2029,17 @@
 
     // 1. 両サイドの「余りコマ(stock)」からのドラッグ
     if (ctx.source === "stock") {
-      // 盤面マスへドロップ → 盤面に配置
       if (targetIdx !== null) {
         const next = cloneState(state);
         next.board[targetIdx] = ctx.side * ctx.type;
         replaceCurrentStateForSetup(next);
         return;
       }
-      // 「持ち駒」エリアへドロップ → 持ち駒に追加（リーダー以外）
       if (targetHandSide !== null && ctx.type !== LEADER) {
         const next = cloneState(state);
         const handObj = targetHandSide === SELF ? next.handSelf : next.handOpp;
         const handType = ctx.type === TURTLE_K ? TURTLE_G : ctx.type;
-        if (handObj[handType] < 4) {
+        if (handObj[handType] < 9) {
           handObj[handType]++;
           replaceCurrentStateForSetup(next);
         }
@@ -1749,7 +2049,6 @@
 
     // 2. 「持ち駒(hand)」からのドラッグ
     if (ctx.source === "hand") {
-      // 盤面の空きマスへドロップ → 持ち駒打ち
       if (targetIdx !== null && state.winner === 0 && ctx.side === state.turn) {
         const legals = generateMoves(state);
         const dropMove = legals.find(m => m.drop && m.piece === ctx.type && m.to === targetIdx);
@@ -1758,7 +2057,6 @@
           return;
         }
       }
-      // 自分の持ち駒枠外へドラッグ → 持ち駒から1枚削除（配置修正用）
       if (targetHandSide !== ctx.side && targetIdx === null) {
         const next = cloneState(state);
         const handObj = ctx.side === SELF ? next.handSelf : next.handOpp;
@@ -1772,20 +2070,18 @@
 
     // 3. 盤面上の駒(board)からのドラッグ
     if (ctx.source === "board") {
-      // 持ち駒エリアへドロップ → 盤上から取り除き持ち駒へ移動
       if (targetHandSide !== null && ctx.type !== LEADER) {
         const next = cloneState(state);
         next.board[ctx.fromIdx] = EMPTY;
         const handObj = targetHandSide === SELF ? next.handSelf : next.handOpp;
         const handType = ctx.type === TURTLE_K ? TURTLE_G : ctx.type;
-        if (handObj[handType] < 4) {
+        if (handObj[handType] < 9) {
           handObj[handType]++;
         }
         replaceCurrentStateForSetup(next);
         return;
       }
 
-      // 盤外へドロップ → 駒を削除
       if (targetIdx === null) {
         const next = cloneState(state);
         next.board[ctx.fromIdx] = EMPTY;
@@ -1795,7 +2091,6 @@
 
       if (targetIdx === ctx.fromIdx) return;
 
-      // 合法手なら対局として進行
       if (state.winner === 0 && ctx.side === state.turn) {
         const legals = generateMoves(state);
         const move = legals.find(m => !m.drop && m.from === ctx.fromIdx && m.to === targetIdx);
@@ -1805,7 +2100,6 @@
         }
       }
 
-      // 合法手以外なら盤面配置変更として移動
       const next = cloneState(state);
       next.board[targetIdx] = next.board[ctx.fromIdx];
       next.board[ctx.fromIdx] = EMPTY;
@@ -1814,7 +2108,7 @@
   });
 
   // ==========================================
-  // 7. 盤面・両サイド縦並び余りコマ・矢印描画（敵予測は点線矢印）
+  // 7. 盤面・両サイド縦並び余りコマ・矢印描画（可変サイズ対応）
   // ==========================================
   function initSideStocks() {
     const types = [LEADER, WHALE, DOLPHIN, TURTLE_G, TURTLE_K];
@@ -1842,7 +2136,38 @@
 
   function renderBoardAndHands() {
     const state = getCurrentState();
+    const { cols, rows } = state;
+    const total = cols * rows;
+
+    // 座標ラベルとグリッドレイアウトを動的に更新
+    const colCoordsEl = document.getElementById("colCoords");
+    colCoordsEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+    colCoordsEl.innerHTML = "";
+    for (let c = 0; c < cols; c++) {
+      const div = document.createElement("div");
+      if (c === 0) div.textContent = `${getColLabel(c)}（自陣）`;
+      else if (c === cols - 1) div.textContent = `${getColLabel(c)}（敵陣）`;
+      else div.textContent = getColLabel(c);
+      colCoordsEl.appendChild(div);
+    }
+
+    const rowCoordsEl = document.getElementById("rowCoords");
+    rowCoordsEl.style.gridTemplateRows = `repeat(${rows}, var(--cell-size))`;
+    rowCoordsEl.innerHTML = "";
+    for (let r = 0; r < rows; r++) {
+      const div = document.createElement("div");
+      div.textContent = getRowLabel(r);
+      rowCoordsEl.appendChild(div);
+    }
+
     const grid = document.getElementById("boardGrid");
+    grid.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
+    grid.style.gridTemplateRows = `repeat(${rows}, var(--cell-size))`;
+    grid.style.width = `calc(var(--cell-size) * ${cols})`;
+    grid.style.height = `calc(var(--cell-size) * ${rows})`;
+
+    const arrowOverlay = document.getElementById("arrowOverlay");
+    arrowOverlay.setAttribute("viewBox", `0 0 ${cols * 100} ${rows * 100}`);
 
     Array.from(grid.querySelectorAll(".cell")).forEach(el => el.remove());
 
@@ -1852,14 +2177,14 @@
       ? activeItem.pv[1]
       : null;
 
-    for (let i = 0; i < 12; i++) {
-      const c = i % 4;
+    for (let i = 0; i < total; i++) {
+      const c = i % cols;
       const cell = document.createElement("div");
       cell.className = "cell";
       cell.dataset.idx = i;
 
       if (c === 0) cell.classList.add("zone-self");
-      if (c === 3) cell.classList.add("zone-opp");
+      if (c === cols - 1) cell.classList.add("zone-opp");
 
       if (selectedBoardIdx === i) cell.classList.add("selected");
       if (state.lastMove && (state.lastMove.from === i || state.lastMove.to === i)) {
@@ -1901,7 +2226,7 @@
         }
       });
 
-      grid.insertBefore(cell, document.getElementById("arrowOverlay"));
+      grid.insertBefore(cell, arrowOverlay);
     }
 
     renderHandList("selfHandList", SELF, state.handSelf, activeBestMove);
@@ -1923,7 +2248,7 @@
     }
 
     document.getElementById("undoBtn").disabled = historyIndex === 0;
-    renderArrows(activeBestMove, state.turn, secondaryOppMove);
+    renderArrows(activeBestMove, state.turn, secondaryOppMove, cols);
   }
 
   function renderHandList(containerId, side, handObj, activeBestMove) {
@@ -1980,11 +2305,11 @@
     }
   }
 
-  function drawSingleArrow(layer, move, side, isPrimary, isPreview, offsetPerp = 0) {
+  function drawSingleArrow(layer, move, side, isPrimary, isPreview, offsetPerp, cols) {
     const ns = "http://www.w3.org/2000/svg";
     const isEnemyMove = (side === OPP);
-    const toR = Math.floor(move.to / 4);
-    const toC = move.to % 4;
+    const toR = Math.floor(move.to / cols);
+    const toC = move.to % cols;
     const x2 = (toC + 0.5) * 100;
     const y2 = (toR + 0.5) * 100;
 
@@ -2010,8 +2335,8 @@
       text.textContent = `${isEnemyMove ? "予測:" : ""}${PIECE_INFO[move.piece].name}打`;
       layer.appendChild(text);
     } else {
-      const fromR = Math.floor(move.from / 4);
-      const fromC = move.from % 4;
+      const fromR = Math.floor(move.from / cols);
+      const fromC = move.from % cols;
       let x1 = (fromC + 0.5) * 100;
       let y1 = (fromR + 0.5) * 100;
       let tx2 = x2;
@@ -2040,14 +2365,12 @@
       line.setAttribute("y2", adjY2);
 
       if (isEnemyMove) {
-        // 敵の移動は予測なので点線矢印にする
         line.setAttribute("stroke", "#f43f5e");
         line.setAttribute("stroke-width", isPrimary ? "7" : "4.5");
         line.setAttribute("stroke-dasharray", isPrimary ? "10 6" : "8 5");
         line.setAttribute("opacity", isPrimary ? "0.92" : "0.78");
         line.setAttribute("marker-end", "url(#ah-opp)");
       } else {
-        // 自分の最善手は実線矢印
         line.setAttribute("stroke", isPreview ? "#38bdf8" : "#10b981");
         line.setAttribute("stroke-width", "8");
         line.setAttribute("stroke-linecap", "round");
@@ -2059,22 +2382,20 @@
     }
   }
 
-  function renderArrows(primaryMove, primarySide, secondaryOppMove) {
+  function renderArrows(primaryMove, primarySide, secondaryOppMove, cols) {
     const layer = document.getElementById("arrowLayer");
     layer.innerHTML = "";
     if (!primaryMove) return;
 
-    // 1手目の矢印（自分なら実線、敵なら点線）
-    drawSingleArrow(layer, primaryMove, primarySide, true, !!previewItem, 0);
+    drawSingleArrow(layer, primaryMove, primarySide, true, !!previewItem, 0, cols);
 
-    // 自分の手番の場合、2手目の「敵の予測応手」も点線矢印で重ねて可視化
     if (primarySide === SELF && secondaryOppMove) {
       let offset = 0;
       if (!primaryMove.drop && !secondaryOppMove.drop &&
           primaryMove.from === secondaryOppMove.to && primaryMove.to === secondaryOppMove.from) {
-        offset = 10; // 真逆の往復矢印が重ならないよう少しずらす
+        offset = 10;
       }
-      drawSingleArrow(layer, secondaryOppMove, OPP, false, false, offset);
+      drawSingleArrow(layer, secondaryOppMove, OPP, false, false, offset, cols);
     }
   }
 
@@ -2167,7 +2488,7 @@
       document.getElementById("evalScoreText").textContent = "配置待機中";
       document.getElementById("evalScoreText").className = "eval-score score-even";
       document.getElementById("evalBarFill").style.width = "50%";
-      document.getElementById("bestCaption").textContent = "盤面セットアップ";
+      document.getElementById("bestCaption").textContent = `盤面セットアップ（横${state.cols} × 縦${state.rows}）`;
       document.getElementById("bestMoveVal").textContent = "両サイドから双方のリーダーを盤面へドラッグしてください";
       document.getElementById("pvSteps").innerHTML = "";
       document.getElementById("candidatesList").innerHTML = "";
@@ -2197,7 +2518,7 @@
       lastAnalysis = analysis;
 
       document.getElementById("statsLine").textContent =
-        `深さ:${analysis.reachedDepth}手 | 探索:${analysis.nodes.toLocaleString()}局面 | ${analysis.elapsed}ms`;
+        `盤面:${state.cols}×${state.rows} | 深さ:${analysis.reachedDepth}手 | 探索:${analysis.nodes.toLocaleString()}局面 | ${analysis.elapsed}ms`;
 
       if (analysis.results.length === 0) {
         document.getElementById("evalScoreText").textContent = "合法手なし（負け）";
@@ -2218,7 +2539,7 @@
         state.turn === SELF
           ? "🔵 自分の最善手（実線）＋ 🔴 敵の予測応手（点線）"
           : "🔴 敵の予測最善手（点線矢印）";
-      document.getElementById("bestMoveVal").textContent = formatMove(best.move, state.turn);
+      document.getElementById("bestMoveVal").textContent = formatMove(best.move, state.turn, state.cols);
 
       const pvBox = document.getElementById("pvSteps");
       pvBox.innerHTML = "";
@@ -2226,7 +2547,7 @@
       best.pv.slice(0, 8).forEach((m, idx) => {
         const chip = document.createElement("span");
         chip.className = `pv-chip ${simSide === SELF ? "s-self" : "s-opp"}`;
-        chip.textContent = `${idx + 1}.${formatMove(m, simSide)}`;
+        chip.textContent = `${idx + 1}.${formatMove(m, simSide, state.cols)}`;
         pvBox.appendChild(chip);
         simSide = -simSide;
       });
@@ -2248,13 +2569,13 @@
       let pvStr = "";
       let s = state.turn;
       item.pv.slice(0, 5).forEach((m, i) => {
-        pvStr += `${i > 0 ? "→" : ""}${formatMove(m, s)}`;
+        pvStr += `${i > 0 ? "→" : ""}${formatMove(m, s, state.cols)}`;
         s = -s;
       });
 
       card.innerHTML = `
         <div class="cand-top">
-          <span class="cand-move-name">#${idx + 1} ${formatMove(item.move, state.turn)}</span>
+          <span class="cand-move-name">#${idx + 1} ${formatMove(item.move, state.turn, state.cols)}</span>
           <span class="${itemEval.cls}" style="font-size:0.72rem; flex-shrink:0;">${itemEval.text}</span>
         </div>
         <div class="cand-pv">読み: ${pvStr}</div>
@@ -2289,7 +2610,7 @@
         chip.textContent = "開始";
       } else {
         const moverSide = history[idx - 1].turn;
-        chip.textContent = `${idx}.${formatMove(st.lastMove, moverSide)}`;
+        chip.textContent = `${idx}.${formatMove(st.lastMove, moverSide, st.cols)}`;
       }
       chip.addEventListener("click", () => {
         historyIndex = idx;
@@ -2307,20 +2628,98 @@
   }
 
   // ==========================================
-  // 10. ボタンイベント & 初期化
+  // 10. ポップアップ・ボタンイベント & 初期化
   // ==========================================
+  const sizePopoverBtn = document.getElementById("sizePopoverBtn");
+  const sizeModalBackdrop = document.getElementById("sizeModalBackdrop");
+  const closeSizeModalBtn = document.getElementById("closeSizeModalBtn");
+  const colsInput = document.getElementById("colsInput");
+  const rowsInput = document.getElementById("rowsInput");
+  const applySizeBtn = document.getElementById("applySizeBtn");
+
   const rulesBtn = document.getElementById("rulesToggleBtn");
   const rulesPopover = document.getElementById("rulesPopover");
 
+  function openSizeModal() {
+    rulesPopover.classList.remove("open");
+    syncSizePopoverUI();
+    sizeModalBackdrop.classList.add("open");
+  }
+
+  function closeSizeModal() {
+    sizeModalBackdrop.classList.remove("open");
+  }
+
+  // マス目モーダル開閉
+  sizePopoverBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (sizeModalBackdrop.classList.contains("open")) {
+      closeSizeModal();
+    } else {
+      openSizeModal();
+    }
+  });
+
+  closeSizeModalBtn.addEventListener("click", closeSizeModal);
+
+  // モーダル背景クリックで閉じる
+  sizeModalBackdrop.addEventListener("click", (e) => {
+    if (e.target === sizeModalBackdrop) {
+      closeSizeModal();
+    }
+  });
+
+  // ルールポップオーバー開閉
   rulesBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    closeSizeModal();
     rulesPopover.classList.toggle("open");
   });
 
+  // ルールポップオーバー外クリックで閉じる
   window.addEventListener("click", (e) => {
     if (!rulesPopover.contains(e.target) && e.target !== rulesBtn) {
       rulesPopover.classList.remove("open");
     }
+  });
+
+  // Escキーでポップアップを閉じる
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closeSizeModal();
+      rulesPopover.classList.remove("open");
+    }
+  });
+
+  // プリセットボタン（4×3 / 4×4）：クリックでテキストボックスに自動入力＆盤面適用
+  document.querySelectorAll(".preset-size-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const c = parseInt(btn.dataset.cols, 10);
+      const r = parseInt(btn.dataset.rows, 10);
+      colsInput.value = c;
+      rowsInput.value = r;
+      changeBoardSize(c, r);
+    });
+  });
+
+  // 数字以外の入力を自動除去
+  [colsInput, rowsInput].forEach(inp => {
+    inp.addEventListener("input", () => {
+      inp.value = inp.value.replace(/[^0-9]/g, "");
+    });
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        changeBoardSize(colsInput.value, rowsInput.value);
+        closeSizeModal();
+      }
+    });
+  });
+
+  // 適用ボタンでカスタムマス目を反映して閉じる
+  applySizeBtn.addEventListener("click", () => {
+    changeBoardSize(colsInput.value, rowsInput.value);
+    closeSizeModal();
   });
 
   document.getElementById("undoBtn").addEventListener("click", () => {
@@ -2333,7 +2732,7 @@
   });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
-    history = [createInitialState()];
+    history = [createInitialState(boardCols, boardRows)];
     historyIndex = 0;
     clearSelection();
     renderAll();
@@ -2342,7 +2741,9 @@
 
   document.getElementById("clearBoardBtn").addEventListener("click", () => {
     const emptyState = {
-      board: Array(12).fill(EMPTY),
+      cols: boardCols,
+      rows: boardRows,
+      board: Array(boardCols * boardRows).fill(EMPTY),
       handSelf: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
       handOpp: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
       turn: getCurrentState().turn,
@@ -2368,6 +2769,7 @@
     triggerAnalysis();
   });
 
+  syncSizePopoverUI();
   initSideStocks();
   renderAll();
   fitToViewport();
