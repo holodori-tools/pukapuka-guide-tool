@@ -168,6 +168,19 @@
     background: #7f1d1d;
   }
 
+  button.btn-tutorial {
+    background: rgba(245, 158, 11, 0.22);
+    border-color: #f59e0b;
+    color: #fde68a;
+    font-weight: 700;
+  }
+
+  button.btn-tutorial:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.38);
+    border-color: #fbbf24;
+    color: #fff;
+  }
+
   /* =========================================
      画面中央マス目設定ポップアップ（モーダル）
      ========================================= */
@@ -1012,6 +1025,152 @@
     display: none;
     filter: drop-shadow(0 8px 16px rgba(0,0,0,0.55));
   }
+
+  /* =========================================
+     ゲーム風チュートリアル・スポットライト＆吹き出しUI
+     ========================================= */
+  #tutorialOverlaySvg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 600;
+  }
+
+  #tutorialOverlaySvg.active {
+    display: block;
+  }
+
+  @keyframes tutPulseRing {
+    0%, 100% {
+      stroke-opacity: 0.95;
+      stroke-width: 3;
+    }
+    50% {
+      stroke-opacity: 0.45;
+      stroke-width: 5;
+    }
+  }
+
+  .tut-highlight-ring {
+    fill: none;
+    stroke: #38bdf8;
+    animation: tutPulseRing 1.4s infinite ease-in-out;
+  }
+
+  #tutorialBubble {
+    display: none;
+    position: fixed;
+    z-index: 700;
+    width: 340px;
+    max-width: calc(100vw - 20px);
+    background: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
+    border: 2px solid #38bdf8;
+    border-radius: 14px;
+    padding: 10px 14px 12px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.82), 0 0 18px rgba(56, 189, 248, 0.28);
+    color: #f8fafc;
+    transition: top 0.18s ease, left 0.18s ease;
+  }
+
+  #tutorialBubble.active {
+    display: block;
+  }
+
+  .tut-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+  }
+
+  .tut-phase-badge {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    padding: 1px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.03em;
+  }
+
+  .tut-stop-btn {
+    background: rgba(153, 27, 27, 0.45);
+    border: 1px solid rgba(248, 113, 113, 0.6);
+    color: #fecaca;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: auto;
+  }
+
+  .tut-stop-btn:hover {
+    background: #991b1b;
+    color: #fff;
+  }
+
+  .tut-body {
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.52;
+    color: #f8fafc;
+    white-space: pre-line;
+    margin-bottom: 9px;
+  }
+
+  .tut-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tut-step-counter {
+    font-size: 0.68rem;
+    color: #94a3b8;
+    font-weight: 700;
+  }
+
+  .tut-action-hint {
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+    color: #6ee7b7;
+  }
+
+  .tut-action-hint.tap-mode {
+    background: rgba(56, 189, 248, 0.22);
+    border-color: #38bdf8;
+    color: #bae6fd;
+    cursor: pointer;
+  }
+
+  .tut-action-hint.tap-mode:hover {
+    background: #0284c7;
+    color: #fff;
+  }
+
+  /* チュートリアル中の操作ロック用スタイル */
+  body.tutorial-locked .piece.tut-disabled {
+    cursor: not-allowed !important;
+    opacity: 0.42;
+  }
+
+  body.tutorial-locked .cell.tut-target-cell {
+    box-shadow: inset 0 0 0 3px #10b981 !important;
+    background-color: rgba(16, 185, 129, 0.28) !important;
+  }
 </style>
 </head>
 <body>
@@ -1042,6 +1201,7 @@
       <button id="undoBtn">↩ 1手戻す</button>
       <button id="resetBtn" class="btn-primary">🔄 初期配置</button>
       <button id="clearBoardBtn" class="btn-danger">🧹 盤面空</button>
+      <button id="tutorialBtn" class="btn-tutorial">🎓 チュートリアル</button>
     </div>
 
     <!-- ルール＆操作ヘルプポップオーバー -->
@@ -1084,7 +1244,7 @@
         <div class="dock-label">余りコマ</div>
         <div class="stock-column" id="selfStockList"></div>
       </div>
-      <div class="dock-block hand-drop-zone" data-side="1" title="ここに余りコマをドラッグすると自分の持ち駒に追加されます">
+      <div class="dock-block hand-drop-zone" id="selfHandDropZone" data-side="1" title="ここに余りコマをドラッグすると自分の持ち駒に追加されます">
         <div class="dock-label">持ち駒(+ドラッグ)</div>
         <div class="hand-row" id="selfHandList"></div>
       </div>
@@ -1121,7 +1281,7 @@
         <div class="dock-label">余りコマ</div>
         <div class="stock-column" id="oppStockList"></div>
       </div>
-      <div class="dock-block hand-drop-zone" data-side="-1" title="ここに余りコマをドラッグすると敵の持ち駒に追加されます">
+      <div class="dock-block hand-drop-zone" id="oppHandDropZone" data-side="-1" title="ここに余りコマをドラッグすると敵の持ち駒に追加されます">
         <div class="dock-label">持ち駒(+ドラッグ)</div>
         <div class="hand-row" id="oppHandList"></div>
       </div>
@@ -1178,8 +1338,8 @@
 
     <!-- プリセットボタン（クリックで下のテキストボックスへ自動入力＆適用） -->
     <div class="preset-row">
-      <button type="button" class="preset-size-btn active" data-cols="4" data-rows="3">4×3（初期値）</button>
-      <button type="button" class="preset-size-btn" data-cols="4" data-rows="4">4×4</button>
+      <button type="button" id="preset4x3Btn" class="preset-size-btn active" data-cols="4" data-rows="3">4×3（初期値）</button>
+      <button type="button" id="preset4x4Btn" class="preset-size-btn" data-cols="4" data-rows="4">4×4</button>
     </div>
 
     <!-- テキストボックス入力（×の前後2つに分割） -->
@@ -1203,6 +1363,31 @@
 
 <!-- ドラッグ追従ゴースト -->
 <div id="dragGhost"></div>
+
+<!-- チュートリアル用スポットライト暗転オーバーレイ（操作箇所のみくり抜き） -->
+<svg id="tutorialOverlaySvg" aria-hidden="true">
+  <defs>
+    <mask id="tutSpotMask">
+      <rect x="0" y="0" width="100%" height="100%" fill="white" />
+      <g id="tutMaskHoles"></g>
+    </mask>
+  </defs>
+  <rect x="0" y="0" width="100%" height="100%" fill="rgba(2, 6, 23, 0.64)" mask="url(#tutSpotMask)" />
+  <g id="tutRingLayer"></g>
+</svg>
+
+<!-- チュートリアル吹き出しガイド -->
+<div id="tutorialBubble" role="dialog" aria-live="polite">
+  <div class="tut-header">
+    <span class="tut-phase-badge" id="tutPhaseTitle">事前準備</span>
+    <button type="button" class="tut-stop-btn" id="tutStopBtn">✕ チュートリアルを止める</button>
+  </div>
+  <div class="tut-body" id="tutBodyText"></div>
+  <div class="tut-footer">
+    <span class="tut-step-counter" id="tutStepCounter">1 / 13</span>
+    <span class="tut-action-hint" id="tutActionHint">タップで次へ ▶</span>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -1289,7 +1474,6 @@
     };
 
     if (rows === 3) {
-      // 3行盤面（4×3など）の標準配置
       set(0, 0, DOLPHIN);
       set(1, 0, LEADER);
       set(2, 0, WHALE);
@@ -1300,7 +1484,6 @@
       set(2, cols - 1, -DOLPHIN);
       if (cols >= 4) set(1, cols - 2, -TURTLE_G);
     } else if (rows === 4) {
-      // 4行盤面（4×4など）のバランス配置
       set(0, 0, DOLPHIN);
       set(1, 0, LEADER);
       set(2, 0, WHALE);
@@ -1319,7 +1502,6 @@
         set(2, cols - 2, -TURTLE_G);
       }
     } else {
-      // その他の任意マス数（2〜10）の汎用対称配置
       const mid = Math.floor(rows / 2);
       set(mid, 0, LEADER);
       if (cols >= 4) set(mid, 1, TURTLE_G);
@@ -1757,6 +1939,16 @@
   let previewItem = null;
   let maxVisibleCandidates = 8;
 
+  // チュートリアル管理オブジェクト
+  const tutorial = {
+    active: false,
+    stepId: null,
+    backup: null,
+    expectedSelfMove1: null,
+    expectedOppMove1: null,
+    expectedSelfMove2: null
+  };
+
   function getCurrentState() {
     return history[historyIndex];
   }
@@ -1852,6 +2044,10 @@
     if (lastAnalysis) {
       renderCandidateCards(lastAnalysis, getCurrentState());
     }
+
+    if (tutorial.active) {
+      updateTutorialVisuals();
+    }
   }
 
   window.addEventListener("resize", () => {
@@ -1932,8 +2128,15 @@
     const isPromoted = (type === TURTLE_K);
     const div = document.createElement("div");
     div.className = `piece ${side === SELF ? "self" : "opp"} ${isPromoted ? "promoted" : ""}`;
+    div.dataset.side = String(side);
+    div.dataset.type = String(type);
+    div.dataset.variant = variant;
     if (variant === "stock") div.classList.add("stock-item");
     if (variant === "hand") div.classList.add("hand-item");
+
+    if (tutorial.active && !isTutorialPieceDragAllowed({ source: variant, side, type })) {
+      div.classList.add("tut-disabled");
+    }
 
     div.appendChild(createPentagonSVG(side, isPromoted));
 
@@ -1966,6 +2169,13 @@
   // ==========================================
   function startPointerDrag(e, ctx) {
     if (e.button !== undefined && e.button !== 0) return;
+
+    // チュートリアル中は許可された駒のみドラッグ開始可
+    if (tutorial.active && !isTutorialPieceDragAllowed(ctx)) {
+      e.stopPropagation();
+      return;
+    }
+
     e.stopPropagation();
 
     dragContext = {
@@ -1977,6 +2187,7 @@
 
     dragGhost.innerHTML = "";
     const ghostPiece = createPieceElement(ctx.side, ctx.type, "board");
+    ghostPiece.classList.remove("tut-disabled");
     dragGhost.appendChild(ghostPiece);
     dragGhost.style.left = `${e.clientX}px`;
     dragGhost.style.top = `${e.clientY}px`;
@@ -2005,6 +2216,17 @@
     document.querySelectorAll(".hand-drop-zone.drag-over-hand").forEach(el => el.classList.remove("drag-over-hand"));
 
     const { cell, handZone } = getDropTargetsAt(e.clientX, e.clientY);
+    const targetIdx = cell ? parseInt(cell.dataset.idx, 10) : null;
+    const targetHandSide = handZone ? parseInt(handZone.dataset.side, 10) : null;
+
+    if (tutorial.active) {
+      if (isTutorialDropAllowed(dragContext, targetIdx, targetHandSide)) {
+        if (cell) cell.classList.add("drag-over");
+        if (handZone) handZone.classList.add("drag-over-hand");
+      }
+      return;
+    }
+
     if (cell) {
       cell.classList.add("drag-over");
     } else if (handZone && dragContext.type !== LEADER) {
@@ -2026,6 +2248,60 @@
     const targetIdx = cell ? parseInt(cell.dataset.idx, 10) : null;
     const targetHandSide = handZone ? parseInt(handZone.dataset.side, 10) : null;
     const state = getCurrentState();
+
+    // チュートリアル中のドロップ検証
+    if (tutorial.active) {
+      if (!isTutorialDropAllowed(ctx, targetIdx, targetHandSide)) {
+        return;
+      }
+
+      if (tutorial.stepId === "3") {
+        const next = cloneState(state);
+        next.board[targetIdx] = SELF * LEADER;
+        replaceCurrentStateForSetup(next);
+        advanceTutorialStep();
+        return;
+      }
+
+      if (tutorial.stepId === "4") {
+        const next = cloneState(state);
+        next.handSelf[TURTLE_G] = 1;
+        replaceCurrentStateForSetup(next);
+        advanceTutorialStep();
+        return;
+      }
+
+      if (tutorial.stepId === "8") {
+        const legals = generateMoves(state);
+        const move = legals.find(m => !m.drop && m.from === ctx.fromIdx && m.to === targetIdx);
+        if (move) {
+          pushNewState(applyMove(state, move));
+          advanceTutorialStep();
+        }
+        return;
+      }
+
+      if (tutorial.stepId === "9") {
+        const legals = generateMoves(state);
+        const move = legals.find(m => !m.drop && m.from === ctx.fromIdx && m.to === targetIdx);
+        if (move) {
+          pushNewState(applyMove(state, move));
+          advanceTutorialStep();
+        }
+        return;
+      }
+
+      if (tutorial.stepId === "10") {
+        const legals = generateMoves(state);
+        const move = legals.find(m => !m.drop && m.from === ctx.fromIdx && m.to === targetIdx);
+        if (move) {
+          pushNewState(applyMove(state, move));
+          advanceTutorialStep();
+        }
+        return;
+      }
+      return;
+    }
 
     // 1. 両サイドの「余りコマ(stock)」からのドラッグ
     if (ctx.source === "stock") {
@@ -2139,7 +2415,6 @@
     const { cols, rows } = state;
     const total = cols * rows;
 
-    // 座標ラベルとグリッドレイアウトを動的に更新
     const colCoordsEl = document.getElementById("colCoords");
     colCoordsEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell-size))`;
     colCoordsEl.innerHTML = "";
@@ -2172,10 +2447,24 @@
     Array.from(grid.querySelectorAll(".cell")).forEach(el => el.remove());
 
     const activeItem = previewItem || (lastAnalysis && lastAnalysis.results[0] ? lastAnalysis.results[0] : null);
-    const activeBestMove = activeItem ? activeItem.move : null;
-    const secondaryOppMove = (state.turn === SELF && activeItem && activeItem.pv && activeItem.pv.length >= 2)
+    let activeBestMove = activeItem ? activeItem.move : null;
+    let secondaryOppMove = (state.turn === SELF && activeItem && activeItem.pv && activeItem.pv.length >= 2)
       ? activeItem.pv[1]
       : null;
+
+    // チュートリアル中は指示矢印を明確に表示
+    if (tutorial.active) {
+      if (["5", "6", "7", "8"].includes(tutorial.stepId) && tutorial.expectedSelfMove1) {
+        activeBestMove = tutorial.expectedSelfMove1;
+        secondaryOppMove = tutorial.expectedOppMove1;
+      } else if (tutorial.stepId === "9" && tutorial.expectedOppMove1) {
+        activeBestMove = tutorial.expectedOppMove1;
+        secondaryOppMove = null;
+      } else if (tutorial.stepId === "10" && tutorial.expectedSelfMove2) {
+        activeBestMove = tutorial.expectedSelfMove2;
+        secondaryOppMove = null;
+      }
+    }
 
     for (let i = 0; i < total; i++) {
       const c = i % cols;
@@ -2203,6 +2492,17 @@
         cell.classList.add("best-drop-target");
       }
 
+      // チュートリアル時の移動先ターゲットハイライト
+      if (tutorial.active) {
+        if (tutorial.stepId === "8" && tutorial.expectedSelfMove1 && i === tutorial.expectedSelfMove1.to) {
+          cell.classList.add("tut-target-cell");
+        } else if (tutorial.stepId === "9" && tutorial.expectedOppMove1 && i === tutorial.expectedOppMove1.to) {
+          cell.classList.add("tut-target-cell");
+        } else if (tutorial.stepId === "10" && tutorial.expectedSelfMove2 && i === tutorial.expectedSelfMove2.to) {
+          cell.classList.add("tut-target-cell");
+        }
+      }
+
       const p = state.board[i];
       if (p !== EMPTY) {
         const side = Math.sign(p);
@@ -2219,6 +2519,7 @@
 
       cell.addEventListener("contextmenu", (e) => {
         e.preventDefault();
+        if (tutorial.active) return;
         if (state.board[i] !== EMPTY) {
           const next = cloneState(state);
           next.board[i] = EMPTY;
@@ -2249,6 +2550,10 @@
 
     document.getElementById("undoBtn").disabled = historyIndex === 0;
     renderArrows(activeBestMove, state.turn, secondaryOppMove, cols);
+
+    if (tutorial.active) {
+      updateTutorialVisuals();
+    }
   }
 
   function renderHandList(containerId, side, handObj, activeBestMove) {
@@ -2285,6 +2590,7 @@
       slot.addEventListener("contextmenu", (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (tutorial.active) return;
         const next = cloneState(state);
         const h = side === SELF ? next.handSelf : next.handOpp;
         if (h[type] > 0) {
@@ -2403,6 +2709,7 @@
   // 8. クリック操作ハンドラ
   // ==========================================
   function handleCellClick(idx) {
+    if (tutorial.active) return; // チュートリアル中はドラッグ操作に限定
     const state = getCurrentState();
     if (state.winner !== 0) return;
 
@@ -2430,6 +2737,7 @@
   }
 
   function handleHandClick(side, type) {
+    if (tutorial.active) return;
     const state = getCurrentState();
     if (state.winner !== 0 || side !== state.turn) return;
 
@@ -2582,14 +2890,17 @@
       `;
 
       card.addEventListener("mouseenter", () => {
+        if (tutorial.active) return;
         previewItem = item;
         renderBoardAndHands();
       });
       card.addEventListener("mouseleave", () => {
+        if (tutorial.active) return;
         previewItem = null;
         renderBoardAndHands();
       });
       card.addEventListener("click", () => {
+        if (tutorial.active) return;
         pushNewState(applyMove(state, item.move));
       });
 
@@ -2613,6 +2924,7 @@
         chip.textContent = `${idx}.${formatMove(st.lastMove, moverSide, st.cols)}`;
       }
       chip.addEventListener("click", () => {
+        if (tutorial.active) return;
         historyIndex = idx;
         clearSelection();
         renderAll();
@@ -2628,7 +2940,537 @@
   }
 
   // ==========================================
-  // 10. ポップアップ・ボタンイベント & 初期化
+  // 10. インタラクティブ・チュートリアルシステム
+  // ==========================================
+  const TUTORIAL_STEPS = [
+    {
+      id: "1a",
+      num: 1,
+      phase: "事前準備",
+      text: "①盤面のサイズを指定します。\nまずは上部の「📐 マス目」ボタンを押してください。",
+      mode: "action",
+      hint: "「マス目」を押す"
+    },
+    {
+      id: "1b",
+      num: 1,
+      phase: "事前準備",
+      text: "①盤面のサイズを指定します。\n「4×3（初期値）」ボタンを押してください。",
+      mode: "action",
+      hint: "「4×3」を押す"
+    },
+    {
+      id: "1c",
+      num: 1,
+      phase: "事前準備",
+      text: "①盤面のサイズを指定します。\n「適用」ボタンを押してサイズを確定します。",
+      mode: "action",
+      hint: "「適用」を押す"
+    },
+    {
+      id: "2",
+      num: 2,
+      phase: "事前準備",
+      text: "②盤上を空にします。\n「🧹 盤面空」ボタンを押してください。",
+      mode: "action",
+      hint: "「盤面空」を押す"
+    },
+    {
+      id: "3",
+      num: 3,
+      phase: "事前準備",
+      text: "③ゲーム画面通りにコマを配置します。左右のエリアからドラッグして置きます。\n左の「自分」エリアからリーダーのコマを盤上のどこかにドラッグしてください。",
+      mode: "action",
+      hint: "リーダーを盤面へドラッグ"
+    },
+    {
+      id: "4",
+      num: 4,
+      phase: "事前準備",
+      text: "④初期持ち駒があれば下のエリアにドラッグします。\n左の「自分」エリアからカメを下の「持ち駒」エリアにドラッグしてください。",
+      mode: "action",
+      hint: "カメを持ち駒へドラッグ"
+    },
+    {
+      id: "5",
+      num: 5,
+      phase: "プレイ中",
+      text: "⑤手番(現在操作する方)が正しいことを確認します。",
+      mode: "tap",
+      hint: "タップで次へ ▶"
+    },
+    {
+      id: "6",
+      num: 6,
+      phase: "プレイ中",
+      text: "⑥緑矢印は自分の最善手を表します。基本はこれ通りに自分のコマを動かします。",
+      mode: "tap",
+      hint: "タップで次へ ▶"
+    },
+    {
+      id: "7",
+      num: 7,
+      phase: "プレイ中",
+      text: "⑦赤の点線矢印は敵の予測手を表します。",
+      mode: "tap",
+      hint: "タップで次へ ▶"
+    },
+    {
+      id: "8",
+      num: 8,
+      phase: "プレイ中",
+      text: "⑧ゲーム内で自分のコマを動かしたら、同じようにこの盤上でもコマを動かします。\n緑の矢印どおりに自分のリーダーをドラッグしてください。",
+      mode: "action",
+      hint: "緑矢印の先へドラッグ"
+    },
+    {
+      id: "9",
+      num: 9,
+      phase: "プレイ中",
+      text: "⑨敵の動きもコマを動かします。敵は赤矢印の予測通りではない動きをすることもあります。今回は矢印どおりに動かしましょう。",
+      mode: "action",
+      hint: "赤点線矢印の先へドラッグ"
+    },
+    {
+      id: "10",
+      num: 10,
+      phase: "プレイ中",
+      text: "⑩最後にコマを動かしてあなたの勝ちです！\n自分のリーダーを敵リーダーに重なるようにドラッグしてください。",
+      mode: "action",
+      hint: "敵リーダーの上へドラッグ"
+    },
+    {
+      id: "11",
+      num: 11,
+      phase: "その他",
+      text: "⑪読みの深さはここで切り替えることが出来ます。",
+      mode: "tap",
+      hint: "タップで次へ ▶"
+    },
+    {
+      id: "12",
+      num: 12,
+      phase: "その他",
+      text: "⑫各コマの動きはここで確認できます。",
+      mode: "tap",
+      hint: "タップで次へ ▶"
+    },
+    {
+      id: "13",
+      num: 13,
+      phase: "その他",
+      text: "チュートリアルは以上です。\nこのツールはクエスト用ですので、対人戦には使用しないでください",
+      mode: "tap",
+      hint: "タップでチュートリアル終了 ✓"
+    }
+  ];
+
+  function getCurrentTutorialStep() {
+    return TUTORIAL_STEPS.find(s => s.id === tutorial.stepId) || null;
+  }
+
+  function isTutorialPieceDragAllowed(ctx) {
+    if (!tutorial.active) return true;
+    if (tutorial.stepId === "3") {
+      return ctx.source === "stock" && ctx.side === SELF && ctx.type === LEADER;
+    }
+    if (tutorial.stepId === "4") {
+      return ctx.source === "stock" && ctx.side === SELF && ctx.type === TURTLE_G;
+    }
+    if (tutorial.stepId === "8") {
+      return ctx.source === "board" && ctx.side === SELF && ctx.type === LEADER;
+    }
+    if (tutorial.stepId === "9") {
+      return ctx.source === "board" && ctx.side === OPP && ctx.type === LEADER;
+    }
+    if (tutorial.stepId === "10") {
+      return ctx.source === "board" && ctx.side === SELF && ctx.type === LEADER;
+    }
+    return false;
+  }
+
+  function isTutorialDropAllowed(ctx, targetIdx, targetHandSide) {
+    if (!tutorial.active) return true;
+    if (tutorial.stepId === "3") {
+      return ctx.source === "stock" && ctx.side === SELF && ctx.type === LEADER && targetIdx !== null;
+    }
+    if (tutorial.stepId === "4") {
+      return ctx.source === "stock" && ctx.side === SELF && ctx.type === TURTLE_G && targetHandSide === SELF;
+    }
+    if (tutorial.stepId === "8") {
+      return tutorial.expectedSelfMove1 && targetIdx === tutorial.expectedSelfMove1.to;
+    }
+    if (tutorial.stepId === "9") {
+      return tutorial.expectedOppMove1 && targetIdx === tutorial.expectedOppMove1.to;
+    }
+    if (tutorial.stepId === "10") {
+      return tutorial.expectedSelfMove2 && targetIdx === tutorial.expectedSelfMove2.to;
+    }
+    return false;
+  }
+
+  function preparePlayPhaseBoard() {
+    const state = cloneState(getCurrentState());
+    const cols = 4;
+    const rows = 3;
+    state.cols = cols;
+    state.rows = rows;
+
+    // 自分リーダーの位置を取得（未配置なら1二＝row1, col0）
+    let selfIdx = state.board.indexOf(SELF * LEADER);
+    let sr = selfIdx !== -1 ? Math.floor(selfIdx / cols) : 1;
+    let sc = selfIdx !== -1 ? (selfIdx % cols) : 0;
+
+    // 2ターン目で敵リーダーを倒せる直線距離（3マス離れ）を確保
+    if (sc !== 0) {
+      state.board[selfIdx] = EMPTY;
+      sc = 0;
+      selfIdx = sr * cols + sc;
+      state.board[selfIdx] = SELF * LEADER;
+    }
+
+    // 敵のリーダーコマがなければ、自分の2ターン目で敵を倒せる場所（同じ行の右端 col=3）に自動配置
+    if (!state.board.includes(OPP * LEADER)) {
+      const oppIdx = sr * cols + (cols - 1);
+      state.board[oppIdx] = OPP * LEADER;
+    }
+
+    const oppIdx = state.board.indexOf(OPP * LEADER);
+    state.turn = SELF;
+    state.winner = 0;
+    state.winReason = "";
+    state.lastMove = null;
+
+    // ⑧・⑨・⑩の直進シナリオ手順を確定
+    const selfMidIdx = sr * cols + 1;
+    const oppMidIdx = sr * cols + 2;
+
+    tutorial.expectedSelfMove1 = {
+      from: selfIdx,
+      to: selfMidIdx,
+      piece: LEADER,
+      captured: EMPTY,
+      promote: false,
+      drop: false
+    };
+
+    tutorial.expectedOppMove1 = {
+      from: oppIdx,
+      to: oppMidIdx,
+      piece: LEADER,
+      captured: EMPTY,
+      promote: false,
+      drop: false
+    };
+
+    tutorial.expectedSelfMove2 = {
+      from: selfMidIdx,
+      to: oppMidIdx,
+      piece: LEADER,
+      captured: LEADER,
+      promote: false,
+      drop: false
+    };
+
+    replaceCurrentStateForSetup(state);
+  }
+
+  function startTutorial() {
+    if (tutorial.active) return;
+
+    // 現在の状態をバックアップ（終了・中断時に復元）
+    tutorial.backup = {
+      cols: boardCols,
+      rows: boardRows,
+      history: history.map(cloneState),
+      historyIndex
+    };
+
+    closeSizeModal();
+    rulesPopover.classList.remove("open");
+
+    tutorial.active = true;
+    tutorial.stepId = "1a";
+    tutorial.expectedSelfMove1 = null;
+    tutorial.expectedOppMove1 = null;
+    tutorial.expectedSelfMove2 = null;
+
+    document.body.classList.add("tutorial-locked");
+    document.getElementById("tutorialOverlaySvg").classList.add("active");
+    document.getElementById("tutorialBubble").classList.add("active");
+
+    initSideStocks();
+    renderAll();
+    updateTutorialVisuals();
+  }
+
+  function stopTutorial() {
+    if (!tutorial.active) return;
+
+    tutorial.active = false;
+    tutorial.stepId = null;
+    tutorial.expectedSelfMove1 = null;
+    tutorial.expectedOppMove1 = null;
+    tutorial.expectedSelfMove2 = null;
+
+    document.body.classList.remove("tutorial-locked");
+    document.getElementById("tutorialOverlaySvg").classList.remove("active");
+    document.getElementById("tutorialBubble").classList.remove("active");
+
+    closeSizeModal();
+    rulesPopover.classList.remove("open");
+
+    // チュートリアル開始前の盤面状態に復元
+    if (tutorial.backup) {
+      boardCols = tutorial.backup.cols;
+      boardRows = tutorial.backup.rows;
+      history = tutorial.backup.history;
+      historyIndex = tutorial.backup.historyIndex;
+      tutorial.backup = null;
+    }
+
+    syncSizePopoverUI();
+    initSideStocks();
+    clearSelection();
+    fitToViewport();
+    renderAll();
+    triggerAnalysis();
+  }
+
+  function advanceTutorialStep() {
+    const idx = TUTORIAL_STEPS.findIndex(s => s.id === tutorial.stepId);
+    if (idx === -1 || idx >= TUTORIAL_STEPS.length - 1) {
+      stopTutorial();
+      return;
+    }
+
+    const nextStep = TUTORIAL_STEPS[idx + 1];
+    tutorial.stepId = nextStep.id;
+
+    // ステップ④完了→ステップ⑤（プレイ中）開始時に敵リーダー自動配置＆手番確認状態へ
+    if (nextStep.id === "5") {
+      preparePlayPhaseBoard();
+    }
+
+    initSideStocks();
+    renderAll();
+    updateTutorialVisuals();
+  }
+
+  function getSpotlightTargetsForStep(stepId) {
+    const targets = [];
+    const addEl = (el, pad = 6) => {
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        targets.push({
+          left: Math.max(2, rect.left - pad),
+          top: Math.max(2, rect.top - pad),
+          width: rect.width + pad * 2,
+          height: rect.height + pad * 2,
+          rx: 8
+        });
+      }
+    };
+
+    switch (stepId) {
+      case "1a":
+        addEl(document.getElementById("sizePopoverBtn"), 5);
+        break;
+      case "1b":
+        addEl(document.getElementById("preset4x3Btn"), 5);
+        break;
+      case "1c":
+        addEl(document.getElementById("applySizeBtn"), 5);
+        break;
+      case "2":
+        addEl(document.getElementById("clearBoardBtn"), 5);
+        break;
+      case "3": {
+        const selfLeaderStock = document.querySelector('#selfStockList .piece[data-type="1"]');
+        addEl(selfLeaderStock, 5);
+        addEl(document.getElementById("boardGrid"), 4);
+        break;
+      }
+      case "4": {
+        const selfTurtleStock = document.querySelector('#selfStockList .piece[data-type="4"]');
+        addEl(selfTurtleStock, 5);
+        addEl(document.getElementById("selfHandDropZone"), 5);
+        break;
+      }
+      case "5":
+        addEl(document.getElementById("turnPill"), 6);
+        break;
+      case "6":
+      case "7":
+      case "8":
+      case "9":
+      case "10":
+        addEl(document.getElementById("boardGrid"), 5);
+        break;
+      case "11":
+        addEl(document.getElementById("depthSelect"), 5);
+        break;
+      case "12":
+        addEl(document.getElementById("rulesToggleBtn"), 5);
+        break;
+      case "13":
+        // 完了ステップは全体オーバーレイ＋中央吹き出し
+        break;
+    }
+    return targets;
+  }
+
+  function updateTutorialVisuals() {
+    if (!tutorial.active) return;
+    const step = getCurrentTutorialStep();
+    if (!step) return;
+
+    // 吹き出しテキスト更新
+    document.getElementById("tutPhaseTitle").textContent = step.phase;
+    document.getElementById("tutBodyText").textContent = step.text;
+    document.getElementById("tutStepCounter").textContent = `${step.num} / 12`;
+
+    const hintEl = document.getElementById("tutActionHint");
+    hintEl.textContent = step.hint;
+    hintEl.classList.toggle("tap-mode", step.mode === "tap");
+
+    // SVGスポットライト穴あきマスク＆ハイライト枠描画
+    const holesGroup = document.getElementById("tutMaskHoles");
+    const ringLayer = document.getElementById("tutRingLayer");
+    holesGroup.innerHTML = "";
+    ringLayer.innerHTML = "";
+
+    const ns = "http://www.w3.org/2000/svg";
+    const targets = getSpotlightTargetsForStep(step.id);
+
+    targets.forEach(t => {
+      const hole = document.createElementNS(ns, "rect");
+      hole.setAttribute("x", t.left);
+      hole.setAttribute("y", t.top);
+      hole.setAttribute("width", t.width);
+      hole.setAttribute("height", t.height);
+      hole.setAttribute("rx", t.rx);
+      hole.setAttribute("fill", "black");
+      holesGroup.appendChild(hole);
+
+      const ring = document.createElementNS(ns, "rect");
+      ring.setAttribute("x", t.left);
+      ring.setAttribute("y", t.top);
+      ring.setAttribute("width", t.width);
+      ring.setAttribute("height", t.height);
+      ring.setAttribute("rx", t.rx);
+      ring.classList.add("tut-highlight-ring");
+      ringLayer.appendChild(ring);
+    });
+
+    // 吹き出し位置のレスポンシブ配置（操作要素を絶対に隠さない）
+    positionTutorialBubble(step.id, targets);
+  }
+
+  function positionTutorialBubble(stepId, targets) {
+    const bubble = document.getElementById("tutorialBubble");
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const bRect = bubble.getBoundingClientRect();
+    const bw = bRect.width || 330;
+    const bh = bRect.height || 135;
+
+    let left = (vw - bw) / 2;
+    let top = (vh - bh) / 2;
+
+    if (stepId === "13") {
+      // 完了時は画面中央
+      left = (vw - bw) / 2;
+      top = (vh - bh) / 2;
+    } else if (stepId === "1b" || stepId === "1c") {
+      // マス目モーダル表示中はモーダルの下側へ配置してボタンを隠さない
+      const modalEl = document.getElementById("sizePopover");
+      const mRect = modalEl.getBoundingClientRect();
+      left = (vw - bw) / 2;
+      if (mRect.bottom + bh + 16 <= vh) {
+        top = mRect.bottom + 12;
+      } else {
+        top = Math.max(10, mRect.top - bh - 12);
+      }
+    } else if (stepId === "3" || stepId === "4") {
+      // 左ドック〜盤面のドラッグを邪魔しないよう、画面右側〜右下へ配置
+      const rightDock = document.getElementById("rightDock");
+      const rRect = rightDock.getBoundingClientRect();
+      const boardEl = document.getElementById("boardGrid");
+      const bdRect = boardEl.getBoundingClientRect();
+      if (vw - bdRect.right >= bw + 20) {
+        left = bdRect.right + 12;
+        top = Math.max(60, (vh - bh) / 2);
+      } else {
+        left = Math.min(vw - bw - 12, Math.max(12, rRect.left - bw + rRect.width));
+        top = Math.min(vh - bh - 12, bdRect.bottom + 10);
+      }
+    } else if (["6", "7", "8", "9", "10"].includes(stepId)) {
+      // 盤面操作時は盤面のすぐ下（下半分エリア上部）に配置して盤面矢印とドラッグを妨げない
+      const boardEl = document.getElementById("boardGrid");
+      const bdRect = boardEl.getBoundingClientRect();
+      left = (vw - bw) / 2;
+      if (bdRect.bottom + bh + 14 <= vh) {
+        top = bdRect.bottom + 10;
+      } else {
+        top = vh - bh - 12;
+      }
+    } else if (targets.length > 0) {
+      // 上部ヘッダー系ボタン（1a, 2, 5, 11, 12）は対象要素のすぐ下に配置
+      const t = targets[0];
+      left = t.left + t.width / 2 - bw / 2;
+      top = t.top + t.height + 10;
+    }
+
+    // 画面端クランプ
+    left = Math.max(10, Math.min(vw - bw - 10, left));
+    top = Math.max(10, Math.min(vh - bh - 10, top));
+
+    bubble.style.left = `${Math.round(left)}px`;
+    bubble.style.top = `${Math.round(top)}px`;
+  }
+
+  // チュートリアル中のグローバル操作ガード＆タップ進行
+  document.addEventListener("click", (e) => {
+    if (!tutorial.active) return;
+
+    // 「チュートリアルを止める」ボタンは常に許可
+    if (e.target.closest("#tutStopBtn")) {
+      e.stopPropagation();
+      stopTutorial();
+      return;
+    }
+
+    const step = getCurrentTutorialStep();
+    if (!step) return;
+
+    // タップ進行ステップ（⑤, ⑥, ⑦, ⑪, ⑫, ⑬）は画面タップで次へ
+    if (step.mode === "tap") {
+      e.preventDefault();
+      e.stopPropagation();
+      advanceTutorialStep();
+      return;
+    }
+
+    // アクションステップのボタン許可チェック
+    if (step.id === "1a") {
+      if (e.target.closest("#sizePopoverBtn")) return; // 許可
+    } else if (step.id === "1b") {
+      if (e.target.closest("#preset4x3Btn")) return; // 許可
+    } else if (step.id === "1c") {
+      if (e.target.closest("#applySizeBtn")) return; // 許可
+    } else if (step.id === "2") {
+      if (e.target.closest("#clearBoardBtn")) return; // 許可
+    }
+
+    // それ以外のクリックはすべてブロック
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  // ==========================================
+  // 11. ポップアップ・ボタンイベント & 初期化
   // ==========================================
   const sizePopoverBtn = document.getElementById("sizePopoverBtn");
   const sizeModalBackdrop = document.getElementById("sizeModalBackdrop");
@@ -2650,9 +3492,15 @@
     sizeModalBackdrop.classList.remove("open");
   }
 
-  // マス目モーダル開閉
   sizePopoverBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (tutorial.active) {
+      if (tutorial.stepId === "1a") {
+        openSizeModal();
+        advanceTutorialStep();
+      }
+      return;
+    }
     if (sizeModalBackdrop.classList.contains("open")) {
       closeSizeModal();
     } else {
@@ -2660,54 +3508,70 @@
     }
   });
 
-  closeSizeModalBtn.addEventListener("click", closeSizeModal);
+  closeSizeModalBtn.addEventListener("click", () => {
+    if (tutorial.active) return;
+    closeSizeModal();
+  });
 
-  // モーダル背景クリックで閉じる
   sizeModalBackdrop.addEventListener("click", (e) => {
+    if (tutorial.active) return;
     if (e.target === sizeModalBackdrop) {
       closeSizeModal();
     }
   });
 
-  // ルールポップオーバー開閉
   rulesBtn.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (tutorial.active) return;
     closeSizeModal();
     rulesPopover.classList.toggle("open");
   });
 
-  // ルールポップオーバー外クリックで閉じる
   window.addEventListener("click", (e) => {
+    if (tutorial.active) return;
     if (!rulesPopover.contains(e.target) && e.target !== rulesBtn) {
       rulesPopover.classList.remove("open");
     }
   });
 
-  // Escキーでポップアップを閉じる
   window.addEventListener("keydown", (e) => {
+    if (tutorial.active) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === "Escape") {
       closeSizeModal();
       rulesPopover.classList.remove("open");
     }
   });
 
-  // プリセットボタン（4×3 / 4×4）：クリックでテキストボックスに自動入力＆盤面適用
   document.querySelectorAll(".preset-size-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const c = parseInt(btn.dataset.cols, 10);
       const r = parseInt(btn.dataset.rows, 10);
+      if (tutorial.active) {
+        if (tutorial.stepId === "1b" && c === 4 && r === 3) {
+          colsInput.value = 4;
+          rowsInput.value = 3;
+          document.querySelectorAll(".preset-size-btn").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          advanceTutorialStep();
+        }
+        return;
+      }
       colsInput.value = c;
       rowsInput.value = r;
       changeBoardSize(c, r);
     });
   });
 
-  // 数字以外の入力を自動除去
   [colsInput, rowsInput].forEach(inp => {
     inp.addEventListener("input", () => {
+      if (tutorial.active) return;
       inp.value = inp.value.replace(/[^0-9]/g, "");
     });
     inp.addEventListener("keydown", (e) => {
+      if (tutorial.active) return;
       if (e.key === "Enter") {
         e.preventDefault();
         changeBoardSize(colsInput.value, rowsInput.value);
@@ -2716,13 +3580,21 @@
     });
   });
 
-  // 適用ボタンでカスタムマス目を反映して閉じる
   applySizeBtn.addEventListener("click", () => {
+    if (tutorial.active) {
+      if (tutorial.stepId === "1c") {
+        changeBoardSize(4, 3);
+        closeSizeModal();
+        advanceTutorialStep();
+      }
+      return;
+    }
     changeBoardSize(colsInput.value, rowsInput.value);
     closeSizeModal();
   });
 
   document.getElementById("undoBtn").addEventListener("click", () => {
+    if (tutorial.active) return;
     if (historyIndex > 0) {
       historyIndex--;
       clearSelection();
@@ -2732,6 +3604,7 @@
   });
 
   document.getElementById("resetBtn").addEventListener("click", () => {
+    if (tutorial.active) return;
     history = [createInitialState(boardCols, boardRows)];
     historyIndex = 0;
     clearSelection();
@@ -2740,21 +3613,26 @@
   });
 
   document.getElementById("clearBoardBtn").addEventListener("click", () => {
+    if (tutorial.active && tutorial.stepId !== "2") return;
     const emptyState = {
       cols: boardCols,
       rows: boardRows,
       board: Array(boardCols * boardRows).fill(EMPTY),
       handSelf: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
       handOpp: { [WHALE]: 0, [DOLPHIN]: 0, [TURTLE_G]: 0 },
-      turn: getCurrentState().turn,
+      turn: SELF,
       lastMove: null,
       winner: 0,
       winReason: ""
     };
     replaceCurrentStateForSetup(emptyState);
+    if (tutorial.active && tutorial.stepId === "2") {
+      advanceTutorialStep();
+    }
   });
 
   document.getElementById("switchTurnBtn").addEventListener("click", () => {
+    if (tutorial.active) return;
     const state = getCurrentState();
     if (state.winner !== 0) return;
     const next = cloneState(state);
@@ -2766,7 +3644,12 @@
   });
 
   document.getElementById("depthSelect").addEventListener("change", () => {
+    if (tutorial.active) return;
     triggerAnalysis();
+  });
+
+  document.getElementById("tutorialBtn").addEventListener("click", () => {
+    startTutorial();
   });
 
   syncSizePopoverUI();
